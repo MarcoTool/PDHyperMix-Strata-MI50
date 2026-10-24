@@ -39,6 +39,17 @@ MI50 具備 32 GB HBM2 與約 1 TB/s 的規格頻寬，兩張即可將 Flash-Nex
 
 參考實作使用 Strata。Strata 支援 session 的儲存與載入，且同一份原始碼可編譯為 CUDA 與 HIP 兩個後端，session 因此能在兩個後端之間交接。
 
+### fork 分支內容
+
+fork 分支 [`gfx906-ep`](https://github.com/MarcoTool/Strata/tree/gfx906-ep) 以上游 Strata 0.1.43.1 為基礎，包含兩個 commit。本頁所有數據皆以此分支實測。
+
+| commit | 內容 | PDHyperMix 是否使用 |
+|---|---|---|
+| [`6d07261`](https://github.com/MarcoTool/Strata/commit/6d072612) | gfx906 兩段式 indexer top-k，由 `STRATA_GFX906_TOPK_SPLIT=1` 啟用 | 使用 |
+| [`2d8a158`](https://github.com/MarcoTool/Strata/commit/2d8a1582) | gfx906 分層 prefill 原型，由 `STRATA_GFX906_SPLIT_PREFILL` 啟用 | 未使用；預設關閉，不影響執行結果 |
+
+分層 prefill 原型是在改採 PD 分離之前，讓 MI50 自行加速 prefill 的實驗，保留於分支中，使分支內容與實測版本一致。
+
 ## 運作方式
 
 - **prefill**：RTX 3070 執行 Strata 的 CUDA 版本。
