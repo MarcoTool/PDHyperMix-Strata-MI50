@@ -54,12 +54,13 @@ and a HIP backend, so a session can be handed off between the two backends.
 ### Contents of the fork branch
 
 The fork branch [`gfx906-ep`](https://github.com/MarcoTool/Strata/tree/gfx906-ep) is based on upstream Strata 0.1.43.1
-and contains two commits. Every number on this page was measured on this branch.
+and contains the commits below. Every number on this page was measured with this branch's code.
 
 | Commit | Change | Used by PDHyperMix |
 |---|---|---|
 | [`6d07261`](https://github.com/MarcoTool/Strata/commit/6d072612) | Two-stage indexer top-k on gfx906, enabled by `STRATA_GFX906_TOPK_SPLIT=1` | Yes |
 | [`2d8a158`](https://github.com/MarcoTool/Strata/commit/2d8a1582) | Layer-split prefill prototype on gfx906, enabled by `STRATA_GFX906_SPLIT_PREFILL` | No; off by default and does not affect results |
+| [`c94d134`](https://github.com/MarcoTool/Strata/commit/c94d134f) | English documentation for the components above | Documentation only, no code |
 
 The layer-split prefill prototype is an experiment from before the move to PD disaggregation, aimed at faster prefill on
 the MI50s alone. It is kept so that the branch matches the measured build exactly.
