@@ -1,0 +1,64 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 300" width="960" height="300" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif" role="img" aria-labelledby="t d">
+  <title id="t">32K prompt: 2× MI50 alone against the prefill / decode split</title>
+  <desc id="d">Measured on 2× MI50 with an RTX 3070, Flash-Next IQ3_S, 32K prompt. Prefill: 400 tok/s on the MI50s alone, 1,597 tok/s with prefill on the RTX 3070. Time to first token: 80 s alone, 24 s split. Total time for the prompt and a 200-token answer: 85.2 s alone, 27.8 s split.</desc>
+  <style>
+    .surface { fill: #fcfcfb; }
+    .ink { fill: #0b0b0b; } .ink2 { fill: #52514e; } .muted { fill: #898781; }
+    .base { stroke: #c3c2b7; }
+    .f1 { fill: #2a78d6; } .f0 { fill: #b5b3aa; }
+    @media (prefers-color-scheme: dark) {
+      .surface { fill: #1a1a19; }
+      .ink { fill: #f0efec; } .ink2 { fill: #c3c2b7; } .muted { fill: #98968f; }
+      .base { stroke: #383835; }
+      .f1 { fill: #3987e5; } .f0 { fill: #5c5b56; }
+    }
+    text { font-size: 13px; }
+    .h { font-size: 17px; font-weight: 600; }
+    .p { font-size: 14px; font-weight: 600; }
+    .num { font-size: 13px; font-variant-numeric: tabular-nums; }
+  </style>
+  <rect class="surface" width="960" height="300" rx="8"/>
+  <text class="ink h" x="24" y="34">32K prompt, Flash-Next IQ3_S</text>
+  <text class="ink2" x="24" y="56">2× MI50 alone, and with prefill moved to an RTX 3070 (decode stays on the MI50s)</text>
+
+  <!-- panel 1: prefill tok/s, scale 1,700 = 190 px -->
+  <g transform="translate(24,96)">
+    <text class="ink p" x="0" y="0">Prefill</text>
+    <text class="muted" x="0" y="20">tokens/s, higher is better</text>
+    <line class="base" x1="86" y1="40" x2="86" y2="132" stroke-width="1"/>
+    <text class="ink2" x="78" y="65" text-anchor="end">MI50 only</text>
+    <rect class="f0" x="87" y="50" width="44.7" height="22" rx="3"/>
+    <text class="ink num" x="137" y="66">400</text>
+    <text class="ink2" x="78" y="111" text-anchor="end">Split</text>
+    <rect class="f1" x="87" y="96" width="178.5" height="22" rx="3"/>
+    <text class="ink num" x="271" y="112">1,597</text>
+  </g>
+
+  <!-- panel 2: TTFT seconds, scale 95 = 190 px -->
+  <g transform="translate(336,96)">
+    <text class="ink p" x="0" y="0">Time to first token</text>
+    <text class="muted" x="0" y="20">seconds, lower is better</text>
+    <line class="base" x1="86" y1="40" x2="86" y2="132" stroke-width="1"/>
+    <text class="ink2" x="78" y="65" text-anchor="end">MI50 only</text>
+    <rect class="f0" x="87" y="50" width="160" height="22" rx="3"/>
+    <text class="ink num" x="253" y="66">80 s</text>
+    <text class="ink2" x="78" y="111" text-anchor="end">Split</text>
+    <rect class="f1" x="87" y="96" width="48" height="22" rx="3"/>
+    <text class="ink num" x="141" y="112">24 s</text>
+  </g>
+
+  <!-- panel 3: total time seconds, scale 95 = 190 px -->
+  <g transform="translate(648,96)">
+    <text class="ink p" x="0" y="0">Prompt + 200-token answer</text>
+    <text class="muted" x="0" y="20">seconds, lower is better</text>
+    <line class="base" x1="86" y1="40" x2="86" y2="132" stroke-width="1"/>
+    <text class="ink2" x="78" y="65" text-anchor="end">MI50 only</text>
+    <rect class="f0" x="87" y="50" width="170.4" height="22" rx="3"/>
+    <text class="ink num" x="263" y="66">85.2 s</text>
+    <text class="ink2" x="78" y="111" text-anchor="end">Split</text>
+    <rect class="f1" x="87" y="96" width="55.6" height="22" rx="3"/>
+    <text class="ink num" x="149" y="112">27.8 s</text>
+  </g>
+
+  <text class="muted" x="24" y="282">Measured on one PC: 2× AMD Instinct MI50 32 GB, NVIDIA RTX 3070 16 GB, Strata, Linux.</text>
+</svg>
