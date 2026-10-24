@@ -1,0 +1,89 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 520" width="960" height="520" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif" role="img" aria-labelledby="t d">
+  <title id="t">How a request flows through the PD split</title>
+  <desc id="d">A request reaches the PD router. A long new prompt goes to the RTX 3070, which prefills it with Strata's CUDA build at about 1,500 to 1,650 tokens per second and saves its session. The session file, 726 MB at a 32K prompt, moves through RAM in /dev/shm and is restored on the two MI50s in about 2 seconds. The MI50s, Strata's HIP build, then reuse the whole prompt and decode the answer. A short request or a follow-up turn goes straight to the MI50s. Both engines map one shared expert arena in RAM.</desc>
+  <defs>
+    <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 z" class="arrowhead"/>
+    </marker>
+  </defs>
+  <style>
+    .surface { fill: #fcfcfb; }
+    .box { fill: #ffffff; stroke: #c3c2b7; stroke-width: 1.5; }
+    .ink { fill: #0b0b0b; }
+    .ink2 { fill: #52514e; }
+    .muted { fill: #898781; }
+    .flow { stroke: #52514e; stroke-width: 2; fill: none; }
+    .dash { stroke: #898781; stroke-width: 1.5; fill: none; stroke-dasharray: 5 4; }
+    .arrowhead { fill: #52514e; }
+    .pre { fill: #eb6834; } .dec { fill: #2a78d6; } .ram { fill: #e87ba4; } .hand { fill: #6250d6; }
+    @media (prefers-color-scheme: dark) {
+      .surface { fill: #1a1a19; }
+      .box { fill: #232321; stroke: #383835; }
+      .ink { fill: #f0efec; }
+      .ink2 { fill: #c3c2b7; }
+      .flow { stroke: #c3c2b7; }
+      .arrowhead { fill: #c3c2b7; }
+      .pre { fill: #d95926; } .dec { fill: #3987e5; } .ram { fill: #d55181; } .hand { fill: #9085e9; }
+    }
+    text { font-size: 13px; }
+    .h { font-size: 17px; font-weight: 600; }
+    .b { font-size: 14px; font-weight: 600; }
+    .num { font-variant-numeric: tabular-nums; }
+  </style>
+  <rect class="surface" width="960" height="520" rx="8"/>
+  <text class="ink h" x="24" y="34">One request through the PD split</text>
+  <text class="ink2" x="24" y="56">Prefill where the matrix math is fast, decode where the memory bandwidth is</text>
+
+  <!-- client and router -->
+  <rect class="box" x="24" y="80" width="200" height="56" rx="8"/>
+  <text class="ink b" x="40" y="104">Client</text>
+  <text class="ink2" x="40" y="124">OpenAI API, streaming</text>
+  <rect class="box" x="360" y="80" width="240" height="56" rx="8"/>
+  <text class="ink b" x="376" y="104">PD router (pd_router.py)</text>
+  <text class="ink2" x="376" y="124">new text ≥ ~2K tokens → PD</text>
+  <path class="flow" d="M224 100 H354" marker-end="url(#a)"/>
+  <path class="flow" d="M360 120 H230" marker-end="url(#a)"/>
+  <text class="muted" x="250" y="94">request</text>
+  <text class="muted" x="250" y="134">tokens</text>
+
+  <!-- prefill card -->
+  <rect class="box" x="24" y="196" width="300" height="104" rx="8"/>
+  <rect class="pre" x="24" y="196" width="6" height="104" rx="3"/>
+  <text class="ink b" x="44" y="222">RTX 3070 16 GB · prefill</text>
+  <text class="ink2" x="44" y="244">Strata, CUDA build (same source)</text>
+  <text class="ink2 num" x="44" y="264">1,500–1,650 tok/s, flat to 128K</text>
+  <text class="ink2" x="44" y="284">saves the session after the prompt</text>
+
+  <!-- decode cards -->
+  <rect class="box" x="636" y="196" width="300" height="104" rx="8"/>
+  <rect class="dec" x="636" y="196" width="6" height="104" rx="3"/>
+  <text class="ink b" x="656" y="222">2× MI50 32 GB · decode</text>
+  <text class="ink2" x="656" y="244">Strata, HIP build (gfx906)</text>
+  <text class="ink2" x="656" y="264">#0: dense, KV, MTP · #1: experts</text>
+  <text class="ink2 num" x="656" y="284">39–47 tok/s chat, ~60 code/math</text>
+
+  <!-- router branches -->
+  <path class="flow" d="M420 136 V166 H174 V190" marker-end="url(#a)"/>
+  <text class="muted" x="200" y="160">long prompt</text>
+  <path class="flow" d="M540 136 V166 H786 V190" marker-end="url(#a)"/>
+  <text class="muted" x="620" y="160">short prompt / follow-up turn</text>
+
+  <!-- handoff -->
+  <rect class="box" x="340" y="330" width="280" height="76" rx="8"/>
+  <rect class="hand" x="340" y="330" width="6" height="76" rx="3"/>
+  <text class="ink b" x="360" y="356">Session snapshot in RAM</text>
+  <text class="ink2 num" x="360" y="376">KV + recurrent state · 726 MB at 32K</text>
+  <text class="ink2 num" x="360" y="396">save 1.2 s + restore 0.9 s (/dev/shm)</text>
+  <path class="flow" d="M174 300 V368 H334" marker-end="url(#a)"/>
+  <path class="flow" d="M620 368 H786 V306" marker-end="url(#a)"/>
+  <text class="muted" x="190" y="360">slot save</text>
+  <text class="muted" x="680" y="360">slot restore</text>
+
+  <!-- shared arena -->
+  <rect class="box" x="24" y="436" width="912" height="56" rx="8"/>
+  <rect class="ram" x="24" y="436" width="6" height="56" rx="3"/>
+  <text class="ink b" x="44" y="460">System RAM · one shared expert arena, 47 GiB (/dev/shm, MAP_SHARED)</text>
+  <text class="ink2" x="44" y="480">two engines, one copy: without it the pair would need ~100 GB on a 94 GB machine</text>
+  <path class="dash" d="M120 436 V306"/>
+  <path class="dash" d="M840 436 V306"/>
+</svg>

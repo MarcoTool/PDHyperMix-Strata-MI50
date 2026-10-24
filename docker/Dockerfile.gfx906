@@ -1,0 +1,45 @@
+# syntax=docker/dockerfile:1
+#
+# The decode engine: Strata's HIP gfx906 build (STRATA_HIP_GFX906), for the MI50s (also MI60 / Radeon VII: not tested).
+#
+# The build context is the same Strata checkout Dockerfile.cuda builds from (see there).
+#
+#   docker build -f docker/Dockerfile.gfx906 -t pdhypermix-dec <strata checkout>
+#
+# AMD's current ROCm no longer ships gfx906 libraries; the base is the community image Strata's docs/AMD_HIP.md
+# names (HIP 7.14, rocBLAS/hipBLAS with gfx906 kernels), pinned to a dated tag. CPU code is compiled for the CPU
+# that builds the image, so build it on the machine that runs it. Host: the kernel's amdgpu driver.
+
+ARG ROCM_IMAGE=mixa3607/rocm-gfx906:7.14-complete-20261018172427
+FROM ${ROCM_IMAGE}
+
+ENV DEBIAN_FRONTEND=noninteractive PYTHONUNBUFFERED=1 LANG=C.UTF-8
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        build-essential ca-certificates curl git \
+        python3 python3-pip python3-venv unzip \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /opt/strata
+COPY . .
+
+RUN python3 -m venv .venv \
+    && .venv/bin/pip install --no-cache-dir -r requirements.txt
+
+# llama.cpp at the commit this checkout pins (setup.py downloads it; its progress lines come first), then the engine
+# parallel compile jobs: 0 = half the cores (each nvcc / hipcc job can take a few GB of RAM)
+ARG BUILD_JOBS=0
+RUN J=$BUILD_JOBS; [ "$J" -gt 0 ] || J=$(( $(nproc) / 2 > 2 ? $(nproc) / 2 : 2 )) \
+    && LLAMA=$(.venv/bin/python -c 'import setup; print(setup.get_llama_cpp())' | tail -n 1) \
+    && test -f "$LLAMA/ggml/CMakeLists.txt" \
+    && .venv/bin/cmake -S . -B build -G Ninja -DCMAKE_MAKE_PROGRAM=$(pwd)/.venv/bin/ninja -DCMAKE_BUILD_TYPE=Release \
+        -DSTRATA_HIP_GFX906=ON -DCMAKE_HIP_ARCHITECTURES=gfx906 -DGPU_TARGETS=gfx906 -DSTRATA_NATIVE_EXPERTS=ON \
+        -DCMAKE_C_COMPILER=/opt/rocm/llvm/bin/clang -DCMAKE_CXX_COMPILER=/opt/rocm/llvm/bin/clang++ \
+        "-DSTRATA_GGML_DIR=$LLAMA" \
+    && .venv/bin/cmake --build build --target strata -j $J \
+    && mkdir -p engine && cp build/strata engine/strata && rm -rf build
+
+ARG STRATA_COMMIT=unknown
+RUN echo "$STRATA_COMMIT" > engine/COMMIT
+
+ENTRYPOINT ["/bin/bash"]

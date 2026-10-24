@@ -1,0 +1,52 @@
+# syntax=docker/dockerfile:1
+#
+# The prefill engine: Strata's CUDA build, for the NVIDIA card.
+#
+# The build context is a Strata checkout (the fork branch with the gfx906 top-k, see the README), the same checkout
+# Dockerfile.gfx906 builds from: the two engines must come from one commit, or the session handoff is refused.
+#
+#   docker build -f docker/Dockerfile.cuda -t pdhypermix-pre <strata checkout>
+#   docker build ... --build-arg CUDA_ARCHITECTURES=86 ...          # one card only: a much faster build
+#
+# The engine is a fat binary with a cubin per listed arch, and the runtime picks the one matching the card. CPU code
+# is compiled for the CPU that builds the image, so build it on the machine that runs it.
+# Host: NVIDIA driver >= 580 and nvidia-container-toolkit.
+
+FROM nvidia/cuda:13.0.0-devel-ubuntu24.04
+
+ENV DEBIAN_FRONTEND=noninteractive PYTHONUNBUFFERED=1 LANG=C.UTF-8
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        build-essential ca-certificates curl git libatomic1 libgomp1 \
+        python3 python3-pip python3-venv unzip \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /opt/strata
+COPY . .
+
+# RTX 20 (75), A-series (80), RTX 30 (86), RTX 40 (89), RTX 50 (120); Strata refuses anything below 75
+ARG CUDA_ARCHITECTURES=75;80;86;89;120
+
+RUN python3 -m venv .venv \
+    && .venv/bin/pip install --no-cache-dir -r requirements.txt
+
+# llama.cpp at the commit this checkout pins (setup.py downloads it; its progress lines come first), then the engine
+# parallel compile jobs: 0 = half the cores (each nvcc / hipcc job can take a few GB of RAM)
+ARG BUILD_JOBS=0
+RUN J=$BUILD_JOBS; [ "$J" -gt 0 ] || J=$(( $(nproc) / 2 > 2 ? $(nproc) / 2 : 2 )) \
+    && LLAMA=$(.venv/bin/python -c 'import setup; print(setup.get_llama_cpp())' | tail -n 1) \
+    && test -f "$LLAMA/ggml/CMakeLists.txt" \
+    && .venv/bin/cmake -S . -B build -G Ninja -DCMAKE_MAKE_PROGRAM=$(pwd)/.venv/bin/ninja -DCMAKE_BUILD_TYPE=Release \
+        -DSTRATA_ENABLE_CUDA=ON -DSTRATA_BUILD_TESTS=OFF \
+        "-DCMAKE_CUDA_ARCHITECTURES=${CUDA_ARCHITECTURES}" -DCMAKE_CUDA_COMPILER=/usr/local/cuda/bin/nvcc \
+        "-DSTRATA_GGML_DIR=$LLAMA" \
+    && (.venv/bin/cmake --build build --target strata -j $J \
+        || .venv/bin/cmake --build build --target strata) \
+    && mkdir -p engine && cp build/strata engine/strata && rm -rf build
+
+# the checkout's commit (.git is not in the build context): pd_up.sh refuses two images built from different ones
+ARG STRATA_COMMIT=unknown
+RUN echo "$STRATA_COMMIT" > engine/COMMIT
+
+# pd_up.sh starts the server itself (serve/server.py with the config pd_cfg.py writes)
+ENTRYPOINT ["/bin/bash"]

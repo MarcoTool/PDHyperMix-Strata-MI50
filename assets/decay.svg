@@ -1,0 +1,74 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 440" width="960" height="440" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif" role="img" aria-labelledby="t d">
+  <title id="t">Decode speed against context depth on the MI50s</title>
+  <desc id="d">Decode tokens per second on the two MI50s (300-token answers, PD setup) at each context depth. Original settings, KV 32K resident: 39.0 short, 42.5 at 32K, 34.7 at 128K, 30.1 at 258K. KV fully in VRAM: 40.7, 44.7, 39.6, 34.4. KV in VRAM plus the two-stage top-k fork: 39.2 short, 46.5 at 32K, 40.0 at 64K, 40.5 at 128K, 39.3 at 192K, 39.4 at 258K.</desc>
+  <style>
+    .surface { fill: #fcfcfb; }
+    .ink { fill: #0b0b0b; } .ink2 { fill: #52514e; } .muted { fill: #898781; }
+    .grid { stroke: #e1e0d9; } .base { stroke: #c3c2b7; }
+    .s1 { stroke: #2a78d6; } .f1 { fill: #2a78d6; }
+    .s2 { stroke: #eb6834; } .f2 { fill: #eb6834; }
+    .s3 { stroke: #1baf7a; } .f3 { fill: #1baf7a; }
+    .ring { stroke: #fcfcfb; }
+    @media (prefers-color-scheme: dark) {
+      .surface { fill: #1a1a19; }
+      .ink { fill: #f0efec; } .ink2 { fill: #c3c2b7; }
+      .grid { stroke: #2c2c2a; } .base { stroke: #383835; }
+      .s1 { stroke: #3987e5; } .f1 { fill: #3987e5; }
+      .s2 { stroke: #d95926; } .f2 { fill: #d95926; }
+      .s3 { stroke: #199e70; } .f3 { fill: #199e70; }
+      .ring { stroke: #1a1a19; }
+    }
+    text { font-size: 13px; }
+    .h { font-size: 17px; font-weight: 600; }
+    .num { font-size: 12px; font-variant-numeric: tabular-nums; }
+    .line { fill: none; stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+    .dot { stroke-width: 2; }
+  </style>
+  <rect class="surface" width="960" height="440" rx="8"/>
+  <text class="ink h" x="24" y="34">Decode stays flat from 64K to 258K</text>
+  <text class="ink2" x="24" y="56">tokens/s on the two MI50s, 300-token answers, PD setup (prefill on the 3070)</text>
+
+  <!-- legend -->
+  <g transform="translate(24,76)">
+    <line class="s1 line" x1="0" y1="6" x2="18" y2="6"/><circle class="f1 ring dot" cx="9" cy="6" r="4"/>
+    <text class="ink2" x="26" y="11">KV in VRAM + two-stage top-k (fork)</text>
+    <line class="s2 line" x1="280" y1="6" x2="298" y2="6"/><circle class="f2 ring dot" cx="289" cy="6" r="4"/>
+    <text class="ink2" x="306" y="11">KV fully in VRAM</text>
+    <line class="s3 line" x1="440" y1="6" x2="458" y2="6"/><circle class="f3 ring dot" cx="449" cy="6" r="4"/>
+    <text class="ink2" x="466" y="11">original (KV 32K in VRAM, rest streamed)</text>
+  </g>
+
+  <!-- plot: x 80..840 for 0..262144 tokens; y 380 (0) .. 120 (50): 5.2 px per tok/s -->
+  <g class="grid" stroke-width="1">
+    <line x1="80" y1="328" x2="840" y2="328"/><line x1="80" y1="276" x2="840" y2="276"/>
+    <line x1="80" y1="224" x2="840" y2="224"/><line x1="80" y1="172" x2="840" y2="172"/>
+    <line x1="80" y1="120" x2="840" y2="120"/>
+  </g>
+  <line class="base" x1="80" y1="380" x2="840" y2="380" stroke-width="1"/>
+  <g class="muted num" text-anchor="end">
+    <text x="70" y="384">0</text><text x="70" y="332">10</text><text x="70" y="280">20</text>
+    <text x="70" y="228">30</text><text x="70" y="176">40</text><text x="70" y="124">50</text>
+  </g>
+  <g class="muted num" text-anchor="middle">
+    <text x="80" y="402">short</text><text x="175" y="402">32K</text><text x="270" y="402">64K</text>
+    <text x="460" y="402">128K</text><text x="650" y="402">192K</text><text x="828" y="402">258K</text>
+  </g>
+  <text class="muted" x="460" y="426" text-anchor="middle">context depth (tokens)</text>
+
+  <!-- original: 39.0@0 42.5@32K 34.7@128K 30.1@258K -->
+  <polyline class="s3 line" points="80,177.2 175,159 460,199.6 828.1,223.5"/>
+  <g class="f3 ring dot"><circle cx="80" cy="177.2" r="4"/><circle cx="175" cy="159" r="4"/><circle cx="460" cy="199.6" r="4"/><circle cx="828.1" cy="223.5" r="4"/></g>
+  <!-- KV in VRAM: 40.7 44.7 39.6 34.4 -->
+  <polyline class="s2 line" points="80,168.4 175,147.6 460,174.1 828.1,201.1"/>
+  <g class="f2 ring dot"><circle cx="80" cy="168.4" r="4"/><circle cx="175" cy="147.6" r="4"/><circle cx="460" cy="174.1" r="4"/><circle cx="828.1" cy="201.1" r="4"/></g>
+  <!-- + two-stage top-k: 39.2@0 46.5@32K 40.0@64K 40.5@128K 39.3@192K 39.4@258K -->
+  <polyline class="s1 line" points="80,176.2 175,138.2 270,172 460,169.4 650,175.6 828.1,175.1"/>
+  <g class="f1 ring dot"><circle cx="80" cy="176.2" r="4"/><circle cx="175" cy="138.2" r="4"/><circle cx="270" cy="172" r="4"/><circle cx="460" cy="169.4" r="4"/><circle cx="650" cy="175.6" r="4"/><circle cx="828.1" cy="175.1" r="4"/></g>
+
+  <!-- direct labels at the line ends -->
+  <g class="ink num">
+    <text x="842" y="179">39.4 fork</text>
+    <text x="842" y="205">34.4</text>
+    <text x="842" y="227">30.1</text>
+  </g>
+</svg>

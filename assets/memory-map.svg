@@ -1,0 +1,100 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 470" width="960" height="470" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif" role="img" aria-labelledby="t d">
+  <title id="t">Memory map of the PD split</title>
+  <desc id="d">Where every byte lives, in GiB on one common scale. RTX 3070 16 GiB: experts 5.7, dense weights and MTP 2.8, KV cache 3.1, buffers 3.6, free 0.8. MI50 number 0, 32 GiB: experts 22.3, dense and MTP 2.8, KV 3.1, buffers 3.4, free 0.4. MI50 number 1, 32 GiB: experts 24.5, buffers 0.3, free 7.2. System RAM 94 GiB: one shared expert arena 46.8 shared by both engines, engines and OS 7, session handoff file 0.7 at a 32K prompt (3.9 at 258K), free 39.5.</desc>
+  <style>
+    .surface { fill: #fcfcfb; }
+    .ink { fill: #0b0b0b; }
+    .ink2 { fill: #52514e; }
+    .muted { fill: #898781; }
+    .grid { stroke: #e1e0d9; }
+    .base { stroke: #c3c2b7; }
+    .c1 { fill: #2a78d6; } .c2 { fill: #eb6834; } .c3 { fill: #1baf7a; } .c4 { fill: #eda100; }
+    .c5 { fill: #e87ba4; } .c6 { fill: #008300; } .c7 { fill: #6250d6; }
+    .free { fill: #e1e0d9; }
+    @media (prefers-color-scheme: dark) {
+      .surface { fill: #1a1a19; }
+      .ink { fill: #f0efec; }
+      .ink2 { fill: #c3c2b7; }
+      .grid { stroke: #2c2c2a; }
+      .base { stroke: #383835; }
+      .c1 { fill: #3987e5; } .c2 { fill: #d95926; } .c3 { fill: #199e70; } .c4 { fill: #c98500; }
+      .c5 { fill: #d55181; } .c6 { fill: #008300; } .c7 { fill: #9085e9; }
+      .free { fill: #2c2c2a; }
+    }
+    text { font-size: 13px; }
+    .h { font-size: 17px; font-weight: 600; }
+    .row { font-size: 14px; font-weight: 600; }
+    .val { font-size: 12px; font-variant-numeric: tabular-nums; }
+  </style>
+  <rect class="surface" width="960" height="470" rx="8"/>
+  <text class="ink h" x="24" y="34">Where every byte lives (GiB, one scale for all four)</text>
+  <text class="ink2" x="24" y="56">Flash-Next IQ3_S, 262K context, KV fully in VRAM · one copy of the experts in RAM, shared by both engines</text>
+
+  <!-- legend -->
+  <g transform="translate(24,78)">
+    <rect class="c1" width="12" height="12" rx="2"/><text class="ink2" x="18" y="11">Routed experts</text>
+    <rect class="c2" x="128" width="12" height="12" rx="2"/><text class="ink2" x="146" y="11">Dense + MTP</text>
+    <rect class="c3" x="236" width="12" height="12" rx="2"/><text class="ink2" x="254" y="11">KV cache</text>
+    <rect class="c4" x="324" width="12" height="12" rx="2"/><text class="ink2" x="342" y="11">Buffers</text>
+    <rect class="c5" x="410" width="12" height="12" rx="2"/><text class="ink2" x="428" y="11">Shared expert arena</text>
+    <rect class="c6" x="566" width="12" height="12" rx="2"/><text class="ink2" x="584" y="11">Engines + OS</text>
+    <rect class="c7" x="680" width="12" height="12" rx="2"/><text class="ink2" x="698" y="11">Session handoff</text>
+    <rect class="free" x="816" width="12" height="12" rx="2"/><text class="ink2" x="834" y="11">Free</text>
+  </g>
+
+  <!-- scale: x0 = 190, 7.8 px per GiB (94 GiB = 733 px) -->
+  <g class="grid" stroke-width="1">
+    <line x1="190" y1="112" x2="190" y2="420"/><line x1="268" y1="112" x2="268" y2="420"/>
+    <line x1="346" y1="112" x2="346" y2="420"/><line x1="424" y1="112" x2="424" y2="420"/>
+    <line x1="502" y1="112" x2="502" y2="420"/><line x1="580" y1="112" x2="580" y2="420"/>
+    <line x1="658" y1="112" x2="658" y2="420"/><line x1="736" y1="112" x2="736" y2="420"/>
+    <line x1="814" y1="112" x2="814" y2="420"/><line x1="892" y1="112" x2="892" y2="420"/>
+  </g>
+  <g class="muted val" text-anchor="middle">
+    <text x="190" y="440">0</text><text x="268" y="440">10</text><text x="346" y="440">20</text><text x="424" y="440">30</text>
+    <text x="502" y="440">40</text><text x="580" y="440">50</text><text x="658" y="440">60</text><text x="736" y="440">70</text>
+    <text x="814" y="440">80</text><text x="892" y="440">90 GiB</text>
+  </g>
+
+  <!-- RTX 3070 16 GiB: experts 5.71, dense+MTP 2.79, KV 3.09, buffers 3.64, free 0.77 -->
+  <text class="ink row" x="24" y="141">RTX 3070</text><text class="muted" x="24" y="158">16 GiB · prefill</text>
+  <g>
+    <rect class="c1" x="190.0" y="124" width="44.5" height="32" rx="4"/>
+    <rect class="c2" x="236.5" y="124" width="21.8" height="32"/>
+    <rect class="c3" x="260.3" y="124" width="24.1" height="32"/>
+    <rect class="c4" x="286.4" y="124" width="28.4" height="32"/>
+    <rect class="free" x="316.8" y="124" width="6.0" height="32" rx="4"/>
+  </g>
+  <text class="ink2 val" x="335" y="145">5.7 experts (2,980 of 24,576) · 3.1 KV · 0.8 free</text>
+
+  <!-- MI50 #0 32 GiB: experts 22.33, dense+MTP 2.79, KV 3.09, buffers 3.42, free 0.35 -->
+  <text class="ink row" x="24" y="211">MI50 #0</text><text class="muted" x="24" y="228">32 GiB · decode</text>
+  <g>
+    <rect class="c1" x="190.0" y="194" width="174.2" height="32" rx="4"/>
+    <rect class="c2" x="366.2" y="194" width="21.8" height="32"/>
+    <rect class="c3" x="390.0" y="194" width="24.1" height="32"/>
+    <rect class="c4" x="416.1" y="194" width="26.7" height="32"/>
+    <rect class="free" x="444.8" y="194" width="2.7" height="32" rx="4"/>
+  </g>
+  <text class="ink2 val" x="460" y="215">22.3 experts (11,771) · dense, KV, MTP · 0.4 free</text>
+
+  <!-- MI50 #1 32 GiB: experts 24.51, buffers 0.27, free 7.2 -->
+  <text class="ink row" x="24" y="281">MI50 #1</text><text class="muted" x="24" y="298">32 GiB · decode</text>
+  <g>
+    <rect class="c1" x="190.0" y="264" width="191.2" height="32" rx="4"/>
+    <rect class="c4" x="383.2" y="264" width="2.1" height="32"/>
+    <rect class="free" x="387.3" y="264" width="56.2" height="32" rx="4"/>
+  </g>
+  <text class="ink2 val" x="456" y="285">24.5 experts (12,805) · 7.2 free → all 24,576 experts in VRAM</text>
+
+  <!-- System RAM 94 GiB: arena 46.84, engines+OS 7, handoff 0.7, free 39.5 -->
+  <text class="ink row" x="24" y="351">System RAM</text><text class="muted" x="24" y="368">94 GiB · fixed</text>
+  <g>
+    <rect class="c5" x="190.0" y="334" width="365.4" height="32" rx="4"/>
+    <rect class="c6" x="557.4" y="334" width="54.6" height="32"/>
+    <rect class="c7" x="614.0" y="334" width="5.5" height="32"/>
+    <rect class="free" x="621.5" y="334" width="307.8" height="32" rx="4"/>
+  </g>
+  <text class="ink2 val" x="190" y="388">46.8 shared expert arena (/dev/shm, MAP_SHARED): the 3070 streams experts from it, the MI50s filled their VRAM from it</text>
+  <text class="ink2 val" x="190" y="405">7 engines + OS · 0.7 session handoff at a 32K prompt (3.9 at 258K) · tmpfs raised to 64 GiB</text>
+</svg>
