@@ -27,7 +27,7 @@ cd PDHyperMix-Strata-MI50/scripts && cp pd.env.example pd.env && $EDITOR pd.env
 
 至少要改的：`STRATA_SRC`（上面那份 checkout）、`DATA`、`WORK`，以及 GPU 編號。
 
-模型（native pack、GGUF、MTP）照 Strata 的 setup 下載與轉換，放進 `DATA` 目錄。
+模型（native pack、GGUF、MTP）照 Strata 的 setup 下載與轉換，放進 `DATA` 目錄。要讀圖片的話，另外把模型的 mmproj 檔放進 `DATA`，並在 `pd.env` 的 `MMPROJ` 填上它在容器內的路徑；`MMPROJ` 留空就只處理文字。圖片交給哪個引擎讀由 `PD_IMAGES` 決定，說明見 README 的「影像輸入」。
 
 ## 2. 編譯兩個映像
 

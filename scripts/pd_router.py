@@ -8,9 +8,12 @@ Two locks make it a two-stage pipeline: one request is prefilled on pd-pre while
 restore and the answer happen under ONE hold of the decode lock, so no other request can replace pd-dec's session in
 between.  Each engine takes one request at a time (Strata's slot save/restore is off with parallel requests).
 
+Images: PD_IMAGES says where a conversation with images goes (see IMAGES_TO below).
+
 Environment: PD_PORT (listen, 20030), PD_PRE_PORT (20061), PD_DEC_PORT (20062), PD_SLOTS (/dev/shm/pd-slots),
-PD_MIN_CHARS (6000).  Standard library only.
+PD_MIN_CHARS (0), PD_IMAGES (decode).  Standard library only.
 """
+import hashlib
 import http.client
 import http.server
 import json
@@ -25,8 +28,18 @@ LISTEN = ('127.0.0.1', int(os.environ.get('PD_PORT', '20030')))
 PRE = ('127.0.0.1', int(os.environ.get('PD_PRE_PORT', '20061')))
 DEC = ('127.0.0.1', int(os.environ.get('PD_DEC_PORT', '20062')))
 SLOTS = os.environ.get('PD_SLOTS', '/dev/shm/pd-slots')
-# new text past what pd-dec holds, in characters, from which the prompt goes to pd-pre (~2K tokens)
-MIN_CHARS = int(os.environ.get('PD_MIN_CHARS', '6000'))
+# new text past what pd-dec holds, in characters, from which the prompt goes to pd-pre; 0: every text request
+MIN_CHARS = int(os.environ.get('PD_MIN_CHARS', '0'))
+# where a conversation with images goes.  'decode' (default): straight to pd-dec, which reads the images with its own
+# encoder.  'prefill': a new image goes to pd-pre (the prefill card's encoder) and the session moves to pd-dec.  Each
+# engine encodes the images again before it decides what it can reuse, and two different encoders (GPU on one side,
+# CPU on the other) do not give bit-identical embeddings, so with 'prefill' pd-dec cannot reuse the session past the
+# first image and reads the prompt again (measured: a small image 14.1 s with 'prefill', 4.6 s with 'decode').
+# Text-only requests ignore this setting.
+IMAGES_TO = os.environ.get('PD_IMAGES', 'decode').strip().lower()
+if IMAGES_TO not in ('prefill', 'decode'):
+    sys.exit(f"PD_IMAGES must be 'prefill' or 'decode', not {IMAGES_TO!r}")
+IMAGE_MARK = '[image:'
 
 pre_lock = threading.Lock()
 dec_lock = threading.Lock()
@@ -37,13 +50,23 @@ def log(*a):
     print(time.strftime('%H:%M:%S'), *a, file=sys.stderr, flush=True)
 
 
+def part_text(p):
+    """A content part as text; an image becomes a marker with a hash of its data, so a new image counts as new text."""
+    if p.get('type') in ('image_url', 'input_image', 'image'):
+        src = p.get('image_url') or p.get('source') or p.get('url') or ''
+        if isinstance(src, dict):
+            src = src.get('url') or src.get('data') or ''
+        return IMAGE_MARK + hashlib.sha1(str(src).encode()).hexdigest()[:16] + ']'
+    return p.get('text', '')
+
+
 def flatten(body):
     """The request's messages as one string, built the same way every time, to compare with what pd-dec holds."""
     out = []
     for m in body.get('messages') or []:
         c = m.get('content')
         if isinstance(c, list):
-            c = ''.join(p.get('text', '') for p in c if isinstance(p, dict))
+            c = ''.join(part_text(p) for p in c if isinstance(p, dict))
         out.append(f"<{m.get('role')}>{c or ''}")
     return '\n'.join(out)
 
@@ -177,10 +200,17 @@ class Handler(http.server.BaseHTTPRequestHandler):
         text = flatten(body)
         # judged against what pd-dec held when the request came in; a request ahead in the queue may change that,
         # which at worst sends a prompt the long way or the short way - never a wrong answer
-        fresh = len(text) - common_prefix(held['text'], text)
+        keep = common_prefix(held['text'], text)
+        fresh = len(text) - keep
+        new_image = IMAGE_MARK in text[keep:]
+        any_image = IMAGE_MARK in text
         name, err = (None, None)
         t0 = time.time()
-        if fresh >= MIN_CHARS:
+        if IMAGES_TO == 'decode' and any_image:
+            use_pd = False                     # the session would not be reused past an image (see IMAGES_TO)
+        else:
+            use_pd = fresh >= MIN_CHARS or new_image
+        if use_pd:
             name, err = prefill(body)          # stage 1: may overlap the previous request's answer on pd-dec
             if err:
                 log('PD prefill failed, pd-dec prefills the prompt itself:', err)
@@ -197,7 +227,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
             t2 = time.time()
             raw = self.relay('POST', self.path, body)
             held['text'] = text + '\n<assistant>' + answer_text(raw)
-        log(f'{len(text)} chars ({fresh} new) {"PD" if name else "direct"}: queue+prefill {t1 - t0:.1f}s '
+        log(f'{len(text)} chars ({fresh} new{", image" if any_image else ""}) {"PD" if name else "direct"}: queue+prefill {t1 - t0:.1f}s '
             f'restore {t2 - t1:.2f}s answer {time.time() - t2:.1f}s')
 
 
@@ -207,5 +237,5 @@ class Server(socketserver.ThreadingMixIn, http.server.HTTPServer):
 
 
 if __name__ == '__main__':
-    log(f'PD router on {LISTEN[0]}:{LISTEN[1]}: pre :{PRE[1]}, dec :{DEC[1]}, PD from {MIN_CHARS} new chars')
+    log(f'PD router on {LISTEN[0]}:{LISTEN[1]}: pre :{PRE[1]}, dec :{DEC[1]}, PD from {MIN_CHARS} new chars, images to {IMAGES_TO}')
     Server(LISTEN, Handler).serve_forever()

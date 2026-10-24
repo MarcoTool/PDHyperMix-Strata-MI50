@@ -39,6 +39,19 @@ RUN J=$BUILD_JOBS; [ "$J" -gt 0 ] || J=$(( $(nproc) / 2 > 2 ? $(nproc) / 2 : 2 )
     && .venv/bin/cmake --build build --target strata -j $J \
     && mkdir -p engine && cp build/strata engine/strata && rm -rf build
 
+# the image encoder (strata-vision) on the CPU, for image input (MMPROJ in pd.env): the MI50s have no VRAM left for it
+# beside the experts.  BUILD_VISION=0 skips it.
+ARG BUILD_VISION=1
+RUN if [ "$BUILD_VISION" = "1" ]; then \
+      J=$BUILD_JOBS; [ "$J" -gt 0 ] || J=$(( $(nproc) / 2 > 2 ? $(nproc) / 2 : 2 )); \
+      LLAMA=$(.venv/bin/python -c 'import setup; print(setup.get_llama_cpp())' | tail -n 1) \
+      && test -f "$LLAMA/ggml/CMakeLists.txt" \
+      && .venv/bin/cmake -S tools/vision -B build-vision -G Ninja -DCMAKE_MAKE_PROGRAM=$(pwd)/.venv/bin/ninja \
+          -DCMAKE_BUILD_TYPE=Release "-DLLAMA_DIR=$LLAMA" -DSTRATA_PORTABLE=OFF \
+      && .venv/bin/cmake --build build-vision --target strata-vision -j $J \
+      && cp build-vision/bin/strata-vision engine/strata-vision && rm -rf build-vision; \
+    fi
+
 ARG STRATA_COMMIT=unknown
 RUN echo "$STRATA_COMMIT" > engine/COMMIT
 

@@ -148,6 +148,25 @@ cp pd.env.example pd.env        # 將 STRATA_SRC 指向 strata-src，並設定�
 
 服務啟動後提供 OpenAI 相容端點 `http://127.0.0.1:20030/v1`。本專案不提供預先建置的映像，`pd_build.sh` 會依 `docker/Dockerfile.cuda` 與 `docker/Dockerfile.gfx906` 在本機建置。模型下載與完整步驟見 [DEPLOY](docs/DEPLOY.md)。
 
+## 路由
+
+路由依 `PD_MIN_CHARS` 決定請求要不要先交給 prefill 卡讀：新增的文字達到這個字元數時，先由 prefill 引擎讀 prompt 並交接 session；否則直接由 decode 引擎處理。預設為 `0`，所有純文字請求都先交給 prefill 卡。prefill 引擎會沿用前幾輪已讀過的 KV，只讀新增的部分，decode 引擎載入 session 後直接生成。
+
+以 agent 的工作方式實測：16K 文件之後，每輪加入約 500 token 的工具結果。`PD_MIN_CHARS` 為 6000 時，這些短增量留在 decode 引擎讀取，每輪 5.4–12.2 s，平均 8.5 s；設為 `0` 後每輪 5.3–5.8 s，平均 5.5 s。
+
+## 影像輸入
+
+在 `pd.env` 設定 `MMPROJ` 後，兩個引擎都會啟用影像功能。prefill 引擎的影像編碼器在 GPU 上執行，decode 引擎的在 CPU 上執行，因為 MI50 的 VRAM 已經全部留給 expert。兩個引擎都必須加上 `--vision`，因為它是 session 指紋的一部分，少了任何一邊交接就會失敗。
+
+帶圖片的對話要交給哪個引擎讀，由路由的 `PD_IMAGES` 決定：
+
+| 值 | 行為 | 小圖實測 |
+|---|---|---|
+| `decode`（預設） | 對話中只要有圖片，就直接送 decode 引擎，由 CPU 編碼器讀圖 | 4.6 s |
+| `prefill` | 新圖片先送 prefill 引擎，由 GPU 編碼器讀圖，再交接 session | 14.1 s |
+
+`prefill` 比較慢，因為每個引擎在判斷能沿用多少 session 之前，都會先重新編碼圖片；GPU 與 CPU 編碼器的結果不會逐位元相同，decode 引擎因此無法沿用圖片之後的 session，只能重讀整個 prompt。純文字請求不受 `PD_IMAGES` 影響，長 prompt 照樣交給 prefill 卡。
+
 ## 已知限制
 
 - 每個引擎同時只處理一個請求，session 存取與平行請求模式互斥。兩個請求同時進入時，整體僅縮短 16%。

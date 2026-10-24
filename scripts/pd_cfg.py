@@ -31,7 +31,17 @@ pre = dict(base, args=common + ['--vram-reserve-mib', '700'],
            log=f"{E['WORK']}/pd-pre.log", lib_dirs=['/usr/local/cuda/bin', '/usr/local/cuda/lib64'], gpu=0, gpus_asked=True)
 dec = dict(base, args=common + ['--expert-cache-device1', 'auto', '--remote-expert-opt'],
            log=f"{E['WORK']}/pd-dec.log", lib_dirs=['/opt/rocm/lib'], backend='hip')
+# images: both engines get --vision (it is part of the session fingerprint, so the handoff needs it on both sides) and an
+# encoder: the prefill card's runs on its GPU, the decode side's on the CPU.  Which one reads a conversation's images is
+# the router's PD_IMAGES.  Without MMPROJ the engines stay text only.
+if E.get('MMPROJ'):
+    enc = {'exe': '/opt/strata/engine/strata-vision', 'mmproj': E['MMPROJ'], 'model': E['SHARD1'], 'max_tokens': 1024}
+    pre['vision'] = dict(enc, gpu=True)
+    dec['vision'] = dict(enc, threads=6)
+    pre['args'] = pre['args'] + ['--vision']
+    dec['args'] = dec['args'] + ['--vision']
 os.makedirs(E['WORK'], exist_ok=True)
 json.dump(pre, open(f"{E['WORK']}/pd-pre.json", 'w'), indent=1)
 json.dump(dec, open(f"{E['WORK']}/pd-dec.json", 'w'), indent=1)
-print(f"wrote {E['WORK']}/pd-pre.json and pd-dec.json (kv-resident {E['KV_RESIDENT']}, max-context {E['MAX_CONTEXT']})")
+print(f"wrote {E['WORK']}/pd-pre.json and pd-dec.json (kv-resident {E['KV_RESIDENT']}, max-context {E['MAX_CONTEXT']}, "
+      f"images {'on' if E.get('MMPROJ') else 'off'})")

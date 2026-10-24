@@ -176,6 +176,25 @@ Once started, the service provides an OpenAI-compatible endpoint at `http://127.
 are provided; `pd_build.sh` builds them locally from `docker/Dockerfile.cuda` and `docker/Dockerfile.gfx906`. Model
 download and the full steps are in [DEPLOY](docs/DEPLOY.md).
 
+## Routing
+
+The router's `PD_MIN_CHARS` decides whether a request is read on the prefill card first: when the new text reaches that many characters, the prefill engine reads the prompt and hands the session over; otherwise the decode engine handles the request itself. The default is `0`, so every text request goes through the prefill card. The prefill engine reuses its KV for the earlier turns and reads only the new part, and the decode engine starts generating right after loading the session.
+
+Measured in an agent-like loop, a 16K document followed by turns that each add about 500 tokens of tool output: with `PD_MIN_CHARS` at 6000 these short additions stayed on the decode engine, 5.4–12.2 s a turn, 8.5 s on average; with `0`, 5.3–5.8 s a turn, 5.5 s on average.
+
+## Image input
+
+With `MMPROJ` set in `pd.env`, both engines get image input. The prefill engine's image encoder runs on its GPU and the decode engine's on the CPU, since the MI50s' VRAM is taken by the experts. Both engines need `--vision`: it is part of the session fingerprint, and the handoff fails if either side lacks it.
+
+The router's `PD_IMAGES` decides which engine reads a conversation's images:
+
+| Value | Behaviour | Small image, measured |
+|---|---|---|
+| `decode` (default) | Any conversation with an image goes straight to the decode engine, whose CPU encoder reads it | 4.6 s |
+| `prefill` | A new image goes to the prefill engine's GPU encoder first, then the session is handed over | 14.1 s |
+
+`prefill` is slower because each engine encodes the images again before it decides how much of the session it can reuse. The GPU and CPU encoders do not give bit-identical results, so the decode engine cannot reuse the session past the image and reads the whole prompt again. Text-only requests ignore `PD_IMAGES`; long prompts still go to the prefill card.
+
 ## Known limitations
 
 - Each engine serves one request at a time; session save/load and parallel request mode exclude each other. Two
