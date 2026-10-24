@@ -1,6 +1,6 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 330" width="960" height="330" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif" role="img" aria-labelledby="t d">
-  <title id="t">Moving prefill to an RTX 3070 cuts the wait for the first token from 80 s to 24 s</title>
-  <desc id="d">32K-token prompt, Flash-Next IQ3_S. Gray: 2× MI50 do prefill and decode. Blue: an RTX 3070 does prefill, 2× MI50 do decode. Prefill speed: 400 against 1,597 tokens per second, 4.0 times faster. Wait for the first token: 80 against 24 seconds, 3.3 times shorter. Prompt plus a 200-token answer: 85.2 against 27.8 seconds, 3.1 times shorter.</desc>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 300" width="960" height="300" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif" role="img" aria-labelledby="t d">
+  <title id="t">Prefill on an RTX 3070 against prefill on the two MI50s</title>
+  <desc id="d">Flash-Next IQ3_S, one PC. Gray: 2× MI50 do prefill and decode. Blue: an RTX 3070 does prefill, 2× MI50 do decode. Prefill speed at a 32K prompt: 391 against 1,597 tokens per second. Time to first token at 32K: 84.0 against 22.5 seconds. Time to first token at 258K: 722.8 against 179.8 seconds.</desc>
   <style>
     .surface { fill: #fcfcfb; }
     .ink { fill: #0b0b0b; } .ink2 { fill: #52514e; } .muted { fill: #898781; }
@@ -18,53 +18,50 @@
     .num { font-size: 13px; font-variant-numeric: tabular-nums; }
     .gain { font-size: 13px; font-weight: 600; }
   </style>
-  <rect class="surface" width="960" height="330" rx="8"/>
-  <text class="ink h" x="24" y="36">Prefill on a second card: first token in 24 s instead of 80 s</text>
-  <text class="ink2" x="24" y="58">A 32K-token prompt, Flash-Next IQ3_S. Decode runs on the two MI50s in both cases.</text>
+  <rect class="surface" width="960" height="300" rx="8"/>
+  <text class="ink h" x="24" y="36">Prefill on an RTX 3070 instead of the two MI50s</text>
+  <text class="ink2" x="24" y="58">Flash-Next IQ3_S. Decode runs on the two MI50s in both cases; the gain depends on the prefill card.</text>
 
   <!-- legend -->
   <g transform="translate(24,80)">
     <rect class="f0" x="0" y="0" width="14" height="14" rx="3"/>
-    <text class="ink2" x="22" y="12">2× MI50 do prefill and decode</text>
+    <text class="ink2" x="22" y="12">Prefill and decode on 2× MI50</text>
     <rect class="f1" x="250" y="0" width="14" height="14" rx="3"/>
-    <text class="ink2" x="272" y="12">RTX 3070 does prefill, 2× MI50 do decode</text>
+    <text class="ink2" x="272" y="12">Prefill on an RTX 3070, decode on 2× MI50</text>
   </g>
 
-  <!-- panel 1: prefill tok/s, 1,700 = 220 px -->
+  <!-- panel 1: prefill tok/s at 32K, 1,700 = 220 px -->
   <g transform="translate(24,134)">
-    <text class="ink p" x="0" y="0">Prefill speed</text>
+    <text class="ink p" x="0" y="0">Prefill speed, 32K prompt</text>
     <text class="muted" x="0" y="19">tokens/s, higher is better</text>
     <line class="base" x1="0" y1="36" x2="0" y2="122" stroke-width="1"/>
-    <rect class="f0" x="1" y="44" width="51.8" height="26" rx="3"/>
-    <text class="ink num" x="59" y="62">400</text>
+    <rect class="f0" x="1" y="44" width="50.6" height="26" rx="3"/>
+    <text class="ink num" x="58" y="62">391</text>
     <rect class="f1" x="1" y="82" width="206.7" height="26" rx="3"/>
     <text class="ink num" x="214" y="100">1,597</text>
-    <text class="t1 gain" x="0" y="150">4.0× faster</text>
   </g>
 
-  <!-- panel 2: seconds, 90 = 220 px -->
+  <!-- panel 2: TTFT at 32K, 90 s = 220 px -->
   <g transform="translate(336,134)">
-    <text class="ink p" x="0" y="0">Wait for the first token</text>
+    <text class="ink p" x="0" y="0">First token, 32K prompt</text>
     <text class="muted" x="0" y="19">seconds, lower is better</text>
     <line class="base" x1="0" y1="36" x2="0" y2="122" stroke-width="1"/>
-    <rect class="f0" x="1" y="44" width="195.6" height="26" rx="3"/>
-    <text class="ink num" x="203" y="62">80 s</text>
-    <rect class="f1" x="1" y="82" width="58.7" height="26" rx="3"/>
-    <text class="ink num" x="66" y="100">24 s</text>
-    <text class="t1 gain" x="0" y="150">3.3× shorter</text>
+    <rect class="f0" x="1" y="44" width="205.3" height="26" rx="3"/>
+    <text class="ink num" x="213" y="62">84.0 s</text>
+    <rect class="f1" x="1" y="82" width="55" height="26" rx="3"/>
+    <text class="ink num" x="63" y="100">22.5 s</text>
   </g>
 
-  <!-- panel 3: seconds, 90 = 220 px -->
+  <!-- panel 3: TTFT at 258K, 780 s = 220 px -->
   <g transform="translate(648,134)">
-    <text class="ink p" x="0" y="0">Prompt and a 200-token answer</text>
-    <text class="muted" x="0" y="19">seconds in total, lower is better</text>
+    <text class="ink p" x="0" y="0">First token, 258K prompt</text>
+    <text class="muted" x="0" y="19">seconds, lower is better</text>
     <line class="base" x1="0" y1="36" x2="0" y2="122" stroke-width="1"/>
-    <rect class="f0" x="1" y="44" width="208.3" height="26" rx="3"/>
-    <text class="ink num" x="216" y="62">85.2 s</text>
-    <rect class="f1" x="1" y="82" width="68" height="26" rx="3"/>
-    <text class="ink num" x="76" y="100">27.8 s</text>
-    <text class="t1 gain" x="0" y="150">3.1× shorter</text>
+    <rect class="f0" x="1" y="44" width="203.9" height="26" rx="3"/>
+    <text class="ink num" x="211" y="62">722.8 s</text>
+    <rect class="f1" x="1" y="82" width="50.7" height="26" rx="3"/>
+    <text class="ink num" x="58" y="100">179.8 s</text>
   </g>
 
-  <text class="muted" x="24" y="314">Measured on one PC: 2× AMD Instinct MI50 32 GB, NVIDIA RTX 3070 16 GB, Strata, Linux.</text>
+  <text class="muted" x="24" y="284">Measured on one PC: 2× AMD Instinct MI50 32 GB, NVIDIA RTX 3070 16 GB, Strata, Linux.</text>
 </svg>
