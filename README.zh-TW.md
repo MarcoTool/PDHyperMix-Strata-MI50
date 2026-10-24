@@ -61,7 +61,7 @@ fork 分支 [`gfx906-ep`](https://github.com/MarcoTool/Strata/tree/gfx906-ep) �
 
 在單機上實現 PD 分離有三個關鍵：
 
-1. **expert 在 RAM 中只保留一份。** IQ3_S 的 expert 約 47 GiB，兩個引擎各載一份會超過 94 GB 的 RAM。Strata 的 `--shared-expert-arena` 將 expert 放在 `/dev/shm` 的共享檔案中，由兩個引擎共同映射。
+1. **expert 在 RAM 中只保留一份。** IQ3_S 的 expert 約 47 GiB，兩個引擎各載一份會超過 96 GB 的 RAM。Strata 的 `--shared-expert-arena` 將 expert 放在 `/dev/shm` 的共享檔案中，由兩個引擎共同映射。
 2. **兩個引擎使用同一份原始碼。** session 帶有設定指紋，兩端的版本、KV 格式與 `--kv-resident` 必須一致，交接才會成功。
 3. **session 經由 RAM 交接。** Strata 以 `O_DIRECT` 與 `fsync` 寫入 session。32K session 的存取在 SATA SSD 上需 4.8 秒，在 `/dev/shm` 上為 2.2 秒。
 
@@ -111,7 +111,7 @@ Strata 的 prefill 速度幾乎不隨上下文長度衰退。本配置的實測�
 | decode | 2× AMD Instinct MI50 32 GB，gfx906，sclk 上限 1,339 MHz，功耗上限 170 W |
 | prefill | NVIDIA RTX 3070 16 GB 改裝版，已解鎖 FP16/BF16，詳見 [BENCHMARKS](docs/BENCHMARKS.md#prefill-卡) |
 | CPU / 主機板 | AMD Threadripper 1920X，ASUS PRIME X399-A，PCIe 3.0 |
-| RAM | 94 GB |
+| RAM | 96 GB |
 | 儲存 | SATA SSD |
 | 軟體 | Ubuntu 22.04，kernel 6.8，ROCm 7.14，NVIDIA 驅動 580，CUDA 13 |
 

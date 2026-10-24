@@ -76,7 +76,7 @@ the MI50s alone. It is kept so that the branch matches the measured build exactl
 
 Three things make PD disaggregation work on a single machine:
 
-1. **One copy of the experts in RAM.** IQ3_S has about 47 GiB of experts; one copy per engine would exceed the 94 GB
+1. **One copy of the experts in RAM.** IQ3_S has about 47 GiB of experts; one copy per engine would exceed the 96 GB
    of RAM. Strata's `--shared-expert-arena` places the experts in a shared file in `/dev/shm`, mapped by both engines.
 2. **Both engines built from one source tree.** A session carries a fingerprint of the engine settings; the version,
    the KV format and `--kv-resident` must match on both sides for the handoff to succeed.
@@ -135,7 +135,7 @@ in [BENCHMARKS](docs/BENCHMARKS.md#與其他硬體的單請求對照).
 | Decode | 2× AMD Instinct MI50 32 GB, gfx906, sclk capped at 1,339 MHz, power capped at 170 W |
 | Prefill | NVIDIA RTX 3070 16 GB, modified board with FP16/BF16 unlocked, see [BENCHMARKS](docs/BENCHMARKS.md#prefill-卡) |
 | CPU / board | AMD Threadripper 1920X, ASUS PRIME X399-A, PCIe 3.0 |
-| RAM | 94 GB |
+| RAM | 96 GB |
 | Storage | SATA SSD |
 | Software | Ubuntu 22.04, kernel 6.8, ROCm 7.14, NVIDIA driver 580, CUDA 13 |
 

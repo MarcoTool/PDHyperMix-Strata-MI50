@@ -87,7 +87,7 @@
   <rect class="box" x="24" y="436" width="912" height="56" rx="8"/>
   <rect class="ram" x="24" y="436" width="6" height="56" rx="3"/>
   <text class="ink b" x="44" y="460">System RAM · one shared expert arena, 47 GiB (/dev/shm, MAP_SHARED)</text>
-  <text class="ink2" x="44" y="480">two engines, one copy: without it the pair would need ~100 GB on a 94 GB machine</text>
+  <text class="ink2" x="44" y="480">two engines, one copy: without it the pair would need about 107 GB on a 96 GB machine</text>
   <path class="dash" d="M120 436 V306"/>
   <path class="dash" d="M840 436 V306"/>
 </svg>

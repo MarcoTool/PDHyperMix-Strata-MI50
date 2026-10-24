@@ -61,7 +61,7 @@ fork 分支 [`gfx906-ep`](https://github.com/MarcoTool/Strata/tree/gfx906-ep) �
 
 在单机上实现 PD 分离有三个关键：
 
-1. **expert 在内存中只保留一份。** IQ3_S 的 expert 约 47 GiB，两个引擎各加载一份会超过 94 GB 内存。Strata 的 `--shared-expert-arena` 将 expert 放在 `/dev/shm` 的共享文件中，由两个引擎共同映射。
+1. **expert 在内存中只保留一份。** IQ3_S 的 expert 约 47 GiB，两个引擎各加载一份会超过 96 GB 内存。Strata 的 `--shared-expert-arena` 将 expert 放在 `/dev/shm` 的共享文件中，由两个引擎共同映射。
 2. **两个引擎使用同一份源码。** session 带有配置指纹，两端的版本、KV 格式与 `--kv-resident` 必须一致，交接才会成功。
 3. **session 经由内存交接。** Strata 以 `O_DIRECT` 与 `fsync` 写入 session。32K session 的存取在 SATA SSD 上需 4.8 秒，在 `/dev/shm` 上为 2.2 秒。
 
@@ -111,7 +111,7 @@ Strata 的 prefill 速度几乎不随上下文长度衰减。本配置的实测�
 | decode | 2× AMD Instinct MI50 32 GB，gfx906，sclk 上限 1,339 MHz，功耗上限 170 W |
 | prefill | NVIDIA RTX 3070 16 GB 魔改版，已解锁 FP16/BF16，详见 [BENCHMARKS](docs/BENCHMARKS.zh-CN.md#prefill-卡) |
 | CPU / 主板 | AMD Threadripper 1920X，ASUS PRIME X399-A，PCIe 3.0 |
-| 内存 | 94 GB |
+| 内存 | 96 GB |
 | 存储 | SATA SSD |
 | 软件 | Ubuntu 22.04，kernel 6.8，ROCm 7.14，NVIDIA 驱动 580，CUDA 13 |
 

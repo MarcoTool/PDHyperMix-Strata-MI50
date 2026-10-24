@@ -6,7 +6,7 @@
 
 | 项目 | 需要 | 我们的机器 |
 |---|---|---|
-| RAM | expert 大小 + 约 15 GB（两个引擎）+ 约 4 GB（系统）+ session 文件（最多约 4 GB） | 94 GB，IQ3_S 的 expert 47 GiB |
+| RAM | expert 大小 + 约 15 GB（两个引擎）+ 约 4 GB（系统）+ session 文件（最多约 4 GB） | 96 GB，IQ3_S 的 expert 47 GiB |
 | prefill 卡 VRAM | dense + KV + MTP + 缓冲区，IQ3_S、262K 时约 9.5 GiB | 3070 16 GB |
 | decode 端 VRAM | 全部 expert + dense + KV + MTP | 2× MI50 32 GB，刚好放下全部 24,576 个 expert |
 
