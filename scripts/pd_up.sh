@@ -49,7 +49,20 @@ echo "prefill engine ready after $(( $(date +%s) - t0 )) s"
 # the GPU device groups by the host's numbers: the image may not know the names (render is missing in the ROCm image)
 gids=""; for g in video render; do id=$(getent group $g | cut -d: -f3); [ -n "$id" ] && gids="$gids --group-add $id"; done
 t0=$(date +%s)
-docker run -d --name pd-dec $DOCKER_ARGS --network host --ipc host -v /dev/shm:/dev/shm --device /dev/kfd --device /dev/dri \
+# DEC_ENCODER=prefill-gpu: the decode engine's image encoder is the prefill image's CUDA encoder, run on the prefill
+# card, so both engines encode a picture bit for bit the same (see pd_cfg.py).  Copy it and its CUDA libraries out of
+# IMG_PRE into $WORK/vision-cuda and give the decode container that card.
+dec_gpu=""
+if [ -n "${MMPROJ:-}" ] && [ "${DEC_ENCODER:-prefill-gpu}" = "prefill-gpu" ]; then
+  V="$WORK/vision-cuda"; mkdir -p "$V"
+  docker run --rm -v "$V":/out --entrypoint bash "$IMG_PRE" -c \
+    'cp /opt/strata/engine/strata-vision /out/ && ldd /opt/strata/engine/strata-vision | awk "/=> \// {print \$3}" | grep -E "cuda|cublas|nccl" | xargs -r -I{} cp -L {} /out/' \
+    || { echo "cannot copy the image encoder out of $IMG_PRE"; exit 1; }
+  printf '#!/bin/sh\nD=$(dirname "$0")\nLD_LIBRARY_PATH="$D${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}" exec "$D/strata-vision" "$@"\n' > "$V/strata-vision.sh"
+  chmod +x "$V/strata-vision.sh"
+  dec_gpu="--gpus device=$PRE_GPU"
+fi
+docker run -d --name pd-dec $DOCKER_ARGS $dec_gpu --network host --ipc host -v /dev/shm:/dev/shm --device /dev/kfd --device /dev/dri \
   $gids -e HOME=/tmp/home -e HSA_OVERRIDE_GFX_VERSION=9.0.6 -e HIP_VISIBLE_DEVICES="$DEC_HIP_DEVICES" $DEC_ENV \
   -v "$DATA":/data -v "$WORK":"$WORK" "$IMG_DEC" \
   -lc "mkdir -p /tmp/home && cd /opt/strata && exec .venv/bin/python serve/server.py --engine strata --config $WORK/pd-dec.json --host 127.0.0.1 --port $PORT_DEC --slot-save-path $SLOTS" >/dev/null
@@ -58,7 +71,7 @@ echo "decode engine ready after $(( $(date +%s) - t0 )) s"
 
 docker run -d --name pd-router --network host -v "$WORK":"$WORK" -v /dev/shm:/dev/shm \
   -e PD_PORT="$PORT_ROUTER" -e PD_PRE_PORT="$PORT_PRE" -e PD_DEC_PORT="$PORT_DEC" -e PD_SLOTS="$SLOTS" -e PD_MIN_CHARS="$PD_MIN_CHARS" \
-  -e PD_IMAGES="${PD_IMAGES:-decode}" \
+  -e PD_IMAGES="${PD_IMAGES:-prefill}" \
   --entrypoint python3 "$IMG_ROUTER" "$WORK/pd_router.py" >/dev/null
 sleep 2
 curl -s -m 10 "http://127.0.0.1:$PORT_ROUTER/v1/models" | grep -q '"loaded"' && echo "router up on 127.0.0.1:$PORT_ROUTER" || echo "router not answering"

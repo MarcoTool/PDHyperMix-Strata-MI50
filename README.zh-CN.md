@@ -156,16 +156,24 @@ cp pd.env.example pd.env        # 将 STRATA_SRC 指向 strata-src，并配置�
 
 ## 图像输入
 
-在 `pd.env` 设置 `MMPROJ` 后，两个引擎都会启用图像功能。prefill 引擎的图像编码器在 GPU 上运行，decode 引擎的在 CPU 上运行，因为 MI50 的显存已经全部留给 expert。两个引擎都必须加上 `--vision`，因为它是 session 指纹的一部分，少了任何一边交接就会失败。
+在 `pd.env` 设置 `MMPROJ` 后，两个引擎都会启用图像功能。两个引擎都必须加上 `--vision`，因为它是 session 指纹的一部分，少了任何一边交接就会失败。
 
-带图片的对话交给哪个引擎读取，由路由的 `PD_IMAGES` 决定：
+图片也能像文本一样交接，但有一个条件：两个引擎必须用同一个编码器、在同一张卡上编码。引擎判断能否沿用 session 时，是以图片向量的哈希识别一张图；每个引擎收到请求都会重新编码图片，GPU 与 CPU 编码器的结果不会逐位一致，哈希对不上，decode 引擎就只能重读整个 prompt。同一个 CUDA 编码器在同一张卡上分两个进程编码同一张图，结果逐位一致。
 
-| 值 | 行为 | 小图实测 |
+| 设置 | 默认 | 作用 |
 |---|---|---|
-| `decode`（默认） | 对话中只要有图片，就直接送 decode 引擎，由 CPU 编码器读图 | 4.6 s |
-| `prefill` | 新图片先送 prefill 引擎，由 GPU 编码器读图，再交接 session | 14.1 s |
+| `DEC_ENCODER` | `prefill-gpu` | decode 引擎的编码器：`prefill-gpu` 在 prefill 卡上运行 prefill 镜像的 CUDA 编码器，`pd_up.sh` 会自动取出并挂载进 decode 容器；`cpu` 则在 CPU 上运行 |
+| `PD_IMAGES` | `prefill` | 带图片的对话：`prefill` 由 prefill 卡读图并交接；`decode` 直接送 decode 引擎自行读图，配合 `DEC_ENCODER=cpu` 使用 |
 
-`prefill` 较慢，因为每个引擎在判断能沿用多少 session 之前，都会先重新编码图片；GPU 与 CPU 编码器的结果不会逐位一致，decode 引擎因此无法沿用图片之后的 session，只能重读整个 prompt。纯文本请求不受 `PD_IMAGES` 影响，长 prompt 照样交给 prefill 卡。
+实测：
+
+| 场景 | 结果 |
+|---|---|
+| 1920×1080 截图，1,045 token，`prefill-gpu` 加 `prefill` | 7.2 s；prefill 卡读取 4.1 s，decode 引擎沿用 1,038 token，回答 1.2 s |
+| 同类截图，CPU 编码器读图 | 最长 66.8 s |
+| 小图，GPU 与 CPU 编码器混用并交接 | 14.1 s，decode 引擎重读 |
+
+`prefill-gpu` 会在 prefill 卡上多占约 1.2 GiB，`pd_cfg.py` 会自动加大 prefill 引擎的 `--vram-reserve-mib`。
 
 ## 已知限制
 

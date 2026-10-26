@@ -184,16 +184,24 @@ Measured in an agent-like loop, a 16K document followed by turns that each add a
 
 ## Image input
 
-With `MMPROJ` set in `pd.env`, both engines get image input. The prefill engine's image encoder runs on its GPU and the decode engine's on the CPU, since the MI50s' VRAM is taken by the experts. Both engines need `--vision`: it is part of the session fingerprint, and the handoff fails if either side lacks it.
+With `MMPROJ` set in `pd.env`, both engines get image input. Both need `--vision`: it is part of the session fingerprint, and the handoff fails if either side lacks it.
 
-The router's `PD_IMAGES` decides which engine reads a conversation's images:
+Images can be handed over like text, on one condition: both engines must encode them with the same encoder on the same card. When the engine decides how much of a session it can reuse, it identifies a picture by a hash of its embeddings. Each engine encodes the images of a request again, and GPU and CPU encoders do not give bit-identical results, so the hashes differ and the decode engine reads the whole prompt again. The same CUDA encoder on the same card, run as two processes on the same picture, gives bit-identical embeddings.
 
-| Value | Behaviour | Small image, measured |
+| Setting | Default | Effect |
 |---|---|---|
-| `decode` (default) | Any conversation with an image goes straight to the decode engine, whose CPU encoder reads it | 4.6 s |
-| `prefill` | A new image goes to the prefill engine's GPU encoder first, then the session is handed over | 14.1 s |
+| `DEC_ENCODER` | `prefill-gpu` | The decode engine's encoder: `prefill-gpu` runs the prefill image's CUDA encoder on the prefill card, which `pd_up.sh` copies out and mounts into the decode container; `cpu` runs it on the CPU |
+| `PD_IMAGES` | `prefill` | A conversation with images: `prefill` reads it on the prefill card and hands it over; `decode` sends it straight to the decode engine, which reads the images itself, for use with `DEC_ENCODER=cpu` |
 
-`prefill` is slower because each engine encodes the images again before it decides how much of the session it can reuse. The GPU and CPU encoders do not give bit-identical results, so the decode engine cannot reuse the session past the image and reads the whole prompt again. Text-only requests ignore `PD_IMAGES`; long prompts still go to the prefill card.
+Measured:
+
+| Case | Result |
+|---|---|
+| 1920×1080 screenshot, 1,045 tokens, `prefill-gpu` with `prefill` | 7.2 s; read on the prefill card in 4.1 s, 1,038 tokens reused by the decode engine, answer in 1.2 s |
+| A similar screenshot read by the CPU encoder | up to 66.8 s |
+| A small image handed over with mixed GPU and CPU encoders | 14.1 s, read again by the decode engine |
+
+`prefill-gpu` takes about 1.2 GiB more of the prefill card; `pd_cfg.py` raises the prefill engine's `--vram-reserve-mib` for it.
 
 ## Known limitations
 

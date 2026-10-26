@@ -11,7 +11,7 @@ between.  Each engine takes one request at a time (Strata's slot save/restore is
 Images: PD_IMAGES says where a conversation with images goes (see IMAGES_TO below).
 
 Environment: PD_PORT (listen, 20030), PD_PRE_PORT (20061), PD_DEC_PORT (20062), PD_SLOTS (/dev/shm/pd-slots),
-PD_MIN_CHARS (0), PD_IMAGES (decode).  Standard library only.
+PD_MIN_CHARS (0), PD_IMAGES (prefill).  Standard library only.
 """
 import hashlib
 import http.client
@@ -30,13 +30,13 @@ DEC = ('127.0.0.1', int(os.environ.get('PD_DEC_PORT', '20062')))
 SLOTS = os.environ.get('PD_SLOTS', '/dev/shm/pd-slots')
 # new text past what pd-dec holds, in characters, from which the prompt goes to pd-pre; 0: every text request
 MIN_CHARS = int(os.environ.get('PD_MIN_CHARS', '0'))
-# where a conversation with images goes.  'decode' (default): straight to pd-dec, which reads the images with its own
-# encoder.  'prefill': a new image goes to pd-pre (the prefill card's encoder) and the session moves to pd-dec.  Each
-# engine encodes the images again before it decides what it can reuse, and two different encoders (GPU on one side,
-# CPU on the other) do not give bit-identical embeddings, so with 'prefill' pd-dec cannot reuse the session past the
-# first image and reads the prompt again (measured: a small image 14.1 s with 'prefill', 4.6 s with 'decode').
-# Text-only requests ignore this setting.
-IMAGES_TO = os.environ.get('PD_IMAGES', 'decode').strip().lower()
+# where a conversation with images goes.  'prefill' (default): like text, pd-pre reads it and the session moves to
+# pd-dec.  Each engine encodes the images again before it decides what it can reuse and keys a picture by a hash of its
+# embeddings, so pd-dec reuses the session past an image only when both engines use the same encoder on the same card
+# (DEC_ENCODER=prefill-gpu, the default; measured: a 1920x1080 screenshot in 7.2 s, 1,038 of 1,045 tokens reused).
+# 'decode': straight to pd-dec, which reads the images itself - the setting for DEC_ENCODER=cpu, where the embeddings
+# differ and a handoff would be read again (a small image: 14.1 s handed over, 4.6 s on pd-dec).  Text ignores this.
+IMAGES_TO = os.environ.get('PD_IMAGES', 'prefill').strip().lower()
 if IMAGES_TO not in ('prefill', 'decode'):
     sys.exit(f"PD_IMAGES must be 'prefill' or 'decode', not {IMAGES_TO!r}")
 IMAGE_MARK = '[image:'

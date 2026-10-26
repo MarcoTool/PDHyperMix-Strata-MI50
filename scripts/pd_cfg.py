@@ -32,16 +32,26 @@ pre = dict(base, args=common + ['--vram-reserve-mib', '700'],
 dec = dict(base, args=common + ['--expert-cache-device1', 'auto', '--remote-expert-opt'],
            log=f"{E['WORK']}/pd-dec.log", lib_dirs=['/opt/rocm/lib'], backend='hip')
 # images: both engines get --vision (it is part of the session fingerprint, so the handoff needs it on both sides) and an
-# encoder: the prefill card's runs on its GPU, the decode side's on the CPU.  Which one reads a conversation's images is
-# the router's PD_IMAGES.  Without MMPROJ the engines stay text only.
+# encoder.  The engine keys a cached picture by a hash of its embeddings, so a session handed over past an image is
+# reused only if both engines produce bit-identical embeddings.  DEC_ENCODER=prefill-gpu (default) runs the decode
+# engine's encoder on the prefill card with the same CUDA binary as the prefill engine (pd_up.sh copies it out of
+# IMG_PRE), which gives the same bits; DEC_ENCODER=cpu runs it on the CPU, which does not, so use PD_IMAGES=decode then.
+# Without MMPROJ the engines stay text only.
+SHARED_ENCODER = E.get('MMPROJ') and E.get('DEC_ENCODER', 'prefill-gpu') == 'prefill-gpu'
 if E.get('MMPROJ'):
     enc = {'exe': '/opt/strata/engine/strata-vision', 'mmproj': E['MMPROJ'], 'model': E['SHARD1'], 'max_tokens': 1024}
     pre['vision'] = dict(enc, gpu=True)
-    dec['vision'] = dict(enc, threads=6)
+    if SHARED_ENCODER:
+        dec['vision'] = dict(enc, exe=f"{E['WORK']}/vision-cuda/strata-vision.sh", gpu=True)
+        # the second encoder takes about 1.2 GiB of the prefill card: leave room for it beside the prefill engine
+        i = pre['args'].index('--vram-reserve-mib')
+        pre['args'][i + 1] = str(int(pre['args'][i + 1]) + 1300)
+    else:
+        dec['vision'] = dict(enc, threads=6)
     pre['args'] = pre['args'] + ['--vision']
     dec['args'] = dec['args'] + ['--vision']
 os.makedirs(E['WORK'], exist_ok=True)
 json.dump(pre, open(f"{E['WORK']}/pd-pre.json", 'w'), indent=1)
 json.dump(dec, open(f"{E['WORK']}/pd-dec.json", 'w'), indent=1)
 print(f"wrote {E['WORK']}/pd-pre.json and pd-dec.json (kv-resident {E['KV_RESIDENT']}, max-context {E['MAX_CONTEXT']}, "
-      f"images {'on' if E.get('MMPROJ') else 'off'})")
+      f"images {('on, decode encoder ' + ('on the prefill GPU' if SHARED_ENCODER else 'on the CPU')) if E.get('MMPROJ') else 'off'})")

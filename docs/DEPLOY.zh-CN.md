@@ -27,7 +27,7 @@ cd PDHyperMix-Strata-MI50/scripts && cp pd.env.example pd.env && $EDITOR pd.env
 
 至少要改的：`STRATA_SRC`（上面那份 checkout）、`DATA`、`WORK`，以及 GPU 编号。
 
-模型（native pack、GGUF、MTP）按 Strata 的 setup 下载和转换，放进 `DATA` 目录。要读取图片的话，另外把模型的 mmproj 文件放进 `DATA`，并在 `pd.env` 的 `MMPROJ` 填上它在容器内的路径；`MMPROJ` 留空就只处理文本。图片交给哪个引擎读取由 `PD_IMAGES` 决定，说明见 README 的“图像输入”。
+模型（native pack、GGUF、MTP）按 Strata 的 setup 下载和转换，放进 `DATA` 目录。要读取图片的话，另外把模型的 mmproj 文件放进 `DATA`，并在 `pd.env` 的 `MMPROJ` 填上它在容器内的路径；`MMPROJ` 留空就只处理文本。默认 `DEC_ENCODER=prefill-gpu`：decode 容器会多挂载 prefill 卡（`--gpus`），用 prefill 镜像的 CUDA 编码器读图，图片才能像文本一样交接；说明见 README 的“图像输入”。
 
 ## 2. 编译两个镜像
 
