@@ -48,6 +48,8 @@ fork 分支 [`gfx906-ep`](https://github.com/MarcoTool/Strata/tree/gfx906-ep) �
 | [`6d07261`](https://github.com/MarcoTool/Strata/commit/6d072612) | gfx906 兩段式 indexer top-k，由 `STRATA_GFX906_TOPK_SPLIT=1` 啟用 | 使用 |
 | [`2d8a158`](https://github.com/MarcoTool/Strata/commit/2d8a1582) | gfx906 分層 prefill 原型，由 `STRATA_GFX906_SPLIT_PREFILL` 啟用 | 未使用；預設關閉，不影響執行結果 |
 | [`c94d134`](https://github.com/MarcoTool/Strata/commit/c94d134f) | 上述元件的英文說明文件 | 僅文件，不涉及程式碼 |
+| [`deab0e6`](https://github.com/MarcoTool/Strata/commit/deab0e6b) | 增量 session 檔：`SAVEFROM <tokens> <path>` 只寫出讀取端尚未持有的 KV | 使用，兩個引擎之間的交接 |
+| [`c8db84f`](https://github.com/MarcoTool/Strata/commit/c8db84f4) | `--scratch-context N`：給 `lane=scratch` 請求使用的小型副 session | 選用，預設關閉（`DEC_SCRATCH_CONTEXT`） |
 
 分層 prefill 原型是在改採 PD 分離之前，讓 MI50 自行加速 prefill 的實驗，保留於分支中，使分支內容與實測版本一致。
 
@@ -153,6 +155,27 @@ cp pd.env.example pd.env        # 將 STRATA_SRC 指向 strata-src，並設定�
 路由依 `PD_MIN_CHARS` 決定請求要不要先交給 prefill 卡讀：新增的文字達到這個字元數時，先由 prefill 引擎讀 prompt 並交接 session；否則直接由 decode 引擎處理。預設為 `0`，所有純文字請求都先交給 prefill 卡。prefill 引擎會沿用前幾輪已讀過的 KV，只讀新增的部分，decode 引擎載入 session 後直接生成。
 
 以 agent 的工作方式實測：16K 文件之後，每輪加入約 500 token 的工具結果。`PD_MIN_CHARS` 為 6000 時，這些短增量留在 decode 引擎讀取，每輪 5.4–12.2 s，平均 8.5 s；設為 `0` 後每輪 5.3–5.8 s，平均 5.5 s。
+
+## 引擎之間的交接
+
+prefill 引擎讀完 prompt 後，decode 引擎需要這段對話的 KV。交接整個 session 的時間跟對話長度成正比：128K token 時為 2.1 GB，每一輪存檔 3.23 秒、還原 4.22 秒。
+
+但 decode 引擎手上已經有到上一輪為止的對話。因此 prefill 引擎只寫出這之後的 KV，加上大小固定、約 230 MiB 的執行狀態，成為增量檔。decode 引擎先確認自己前段的 token 與圖片跟檔案一致，才接上新增的部分；不一致時拒絕這個檔案、不做任何更動，由 router 改為交接整個 session。
+
+| 上下文 | 整個 session | 增量 |
+|---|---|---|
+| 16K | 471–496 MiB，存檔 0.95 s、還原 0.93 s | 233 MiB，存檔 0.65 s、還原 0.42 s |
+| 128K | 2,135 MiB，存檔 3.23 s、還原 4.22 s | 234 MiB，存檔 0.51 s、還原 0.36 s |
+
+回答完全相同：溫度 0 下連續五輪，增量交接開啟與關閉時每一輪回答的 MD5 都一致。每輪的基準點設在上一個 prompt 結尾前 64 個 token，新舊文字接縫處的 token 切分不同時也不會被拒絕。設定 `PD_DELTA=0` 可關閉。
+
+### 副 session
+
+有些用戶端會另外送出與對話無關的短請求，例如生成標題、審核指令、子代理。這些請求過去每次都會換掉主對話的快取，主對話下一輪就必須重讀整段歷史。
+
+設定 `DEC_SCRATCH_CONTEXT=32768` 後，decode 引擎在主 session 旁另外常駐一個小型 session，有自己的 prompt 讀取、verifier、草稿 KV 與 checkpoint，權重、專家快取與草稿權重則與主 session 共用。請求跟主對話共同的文字不到一半、而且放得進副 session 時，router 就把它送到副 session，不經過 prefill 卡。主對話內的工具呼叫不屬於副請求：工具結果會成為主對話的一部分，走增量交接。
+
+以 16K 的主對話實測，在每一輪之間插入副請求後，主對話仍然走增量交接。系統提示 2,473 token 的副請求第一次 12.2 秒，之後沿用自己的 checkpoint，0.5–0.7 秒。帶圖片的副請求也可使用。代價是副 session 約 0.56 GiB，第一張 MI50 另外多保留 500 MiB，專家快取因此減少約 5%。設定為 0 時不配置任何記憶體，引擎輸出與不含此功能的版本逐位元相同。
 
 ## 影像輸入
 

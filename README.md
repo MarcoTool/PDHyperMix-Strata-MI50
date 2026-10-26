@@ -61,6 +61,8 @@ and contains the commits below. Every number on this page was measured with this
 | [`6d07261`](https://github.com/MarcoTool/Strata/commit/6d072612) | Two-stage indexer top-k on gfx906, enabled by `STRATA_GFX906_TOPK_SPLIT=1` | Yes |
 | [`2d8a158`](https://github.com/MarcoTool/Strata/commit/2d8a1582) | Layer-split prefill prototype on gfx906, enabled by `STRATA_GFX906_SPLIT_PREFILL` | No; off by default and does not affect results |
 | [`c94d134`](https://github.com/MarcoTool/Strata/commit/c94d134f) | English documentation for the components above | Documentation only, no code |
+| [`deab0e6`](https://github.com/MarcoTool/Strata/commit/deab0e6b) | Incremental session files: `SAVEFROM <tokens> <path>` writes only the K/V past what the reader already holds | Yes, the handover between the engines |
+| [`c8db84f`](https://github.com/MarcoTool/Strata/commit/c8db84f4) | `--scratch-context N`: a small side session for requests sent with `lane=scratch` | Optional, off by default (`DEC_SCRATCH_CONTEXT`) |
 
 The layer-split prefill prototype is an experiment from before the move to PD disaggregation, aimed at faster prefill on
 the MI50s alone. It is kept so that the branch matches the measured build exactly.
@@ -181,6 +183,27 @@ download and the full steps are in [DEPLOY](docs/DEPLOY.md).
 The router's `PD_MIN_CHARS` decides whether a request is read on the prefill card first: when the new text reaches that many characters, the prefill engine reads the prompt and hands the session over; otherwise the decode engine handles the request itself. The default is `0`, so every text request goes through the prefill card. The prefill engine reuses its KV for the earlier turns and reads only the new part, and the decode engine starts generating right after loading the session.
 
 Measured in an agent-like loop, a 16K document followed by turns that each add about 500 tokens of tool output: with `PD_MIN_CHARS` at 6000 these short additions stayed on the decode engine, 5.4–12.2 s a turn, 8.5 s on average; with `0`, 5.3–5.8 s a turn, 5.5 s on average.
+
+## Handover between the engines
+
+After the prefill engine reads a prompt, the decode engine needs that conversation's KV. Handing over the whole session costs time in proportion to the conversation's length: 2.1 GB at 128K tokens, 3.23 s to save and 4.22 s to restore, on every turn.
+
+The decode engine, however, already holds the conversation up to the previous turn. The prefill engine therefore writes an incremental file holding only the KV past that point, plus the running state, which has a fixed size of about 230 MiB. The decode engine first checks that its own first tokens and images match the file; only then does it append the new part. When they do not match, it refuses the file without changing anything, and the router hands over the whole session instead.
+
+| Context | Whole session | Incremental |
+|---|---|---|
+| 16K | 471–496 MiB, save 0.95 s, restore 0.93 s | 233 MiB, save 0.65 s, restore 0.42 s |
+| 128K | 2,135 MiB, save 3.23 s, restore 4.22 s | 234 MiB, save 0.51 s, restore 0.36 s |
+
+Answers are identical: over five turns at temperature 0, every answer has the same MD5 with incremental handover on and off. Each turn's base point is set 64 tokens before the end of the previous prompt, so a token boundary that differs at the seam between old and new text does not cause a refusal. `PD_DELTA=0` turns this off.
+
+### Side session
+
+Some clients send short requests that have nothing to do with the conversation: generating a title, an approval check, a sub-agent. Each of these used to replace the main conversation's cache, so the main conversation's next turn had to read its whole history again.
+
+With `DEC_SCRATCH_CONTEXT=32768`, the decode engine keeps a second, small session beside the main one. It has its own prompt path, verifier, draft KV and checkpoints, and shares the weights, the expert cache and the draft weights with the main session. The router sends a request there when it shares less than half of its text with the main conversation and fits in the side session; the prefill card is not involved. Tool calls inside the main conversation are not side requests: their results become part of the main conversation and use the incremental handover.
+
+Measured with a 16K main conversation and side requests between its turns: after every side request the main conversation still used the incremental handover. A side request with a 2,473-token system prompt took 12.2 s the first time and 0.5–0.7 s afterwards, because it reuses its own checkpoint. Side requests with images also work. The cost is about 0.56 GiB for the side session and 500 MiB more reserved on the first MI50, which shrinks the expert cache by about 5%. With the setting at 0, nothing is allocated and the engine's output is byte-identical to a build without this feature.
 
 ## Image input
 

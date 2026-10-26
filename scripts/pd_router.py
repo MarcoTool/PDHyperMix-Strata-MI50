@@ -10,8 +10,18 @@ between.  Each engine takes one request at a time (Strata's slot save/restore is
 
 Images: PD_IMAGES says where a conversation with images goes (see IMAGES_TO below).
 
+Incremental handover (PD_DELTA, on by default): when a prompt continues the one pd-dec last restored, pd-pre writes
+only the K/V past that point plus the running state, about 0.25 GB, instead of the whole session (2.1 GB at 128K
+tokens).  pd-dec checks that it holds the file's first tokens before applying it; when it does not, pd-pre writes the
+whole session and that is restored instead.
+
+Side requests (PD_SCRATCH, off by default; needs pd-dec started with --scratch-context): a short request that shares
+little with the main conversation - a title, a helper's call - runs on pd-dec's side session and never touches pd-pre
+or the main conversation's cells.
+
 Environment: PD_PORT (listen, 20030), PD_PRE_PORT (20061), PD_DEC_PORT (20062), PD_SLOTS (/dev/shm/pd-slots),
-PD_MIN_CHARS (0), PD_IMAGES (prefill).  Standard library only.
+PD_MIN_CHARS (0), PD_IMAGES (prefill), PD_DELTA (1), PD_SCRATCH (0), PD_SCRATCH_MAIN (30000), PD_SCRATCH_MAX (60000),
+PD_SCRATCH_CTX (32768).  Standard library only.
 """
 import hashlib
 import http.client
@@ -44,6 +54,16 @@ IMAGE_MARK = '[image:'
 pre_lock = threading.Lock()
 dec_lock = threading.Lock()
 held = {'text': ''}   # the conversation pd-dec holds after its last answer (prompt + answer); guarded by dec_lock
+# what pd-dec holds from its last restore: the prompt text and its token count (0: nothing known); guarded by dec_lock
+restored = {'text': '', 'tokens': 0}
+DELTA = os.environ.get('PD_DELTA', '1') != '0'
+# side requests go to pd-dec's side session only while a main conversation of PD_SCRATCH_MAIN characters or more is
+# held, when they share less than half of their text with it, and when the prompt, counted as one token per character
+# (CJK text; English needs fewer), plus the output asked for fits in 90% of PD_SCRATCH_CTX (pd-dec's --scratch-context)
+SCRATCH = os.environ.get('PD_SCRATCH', '0') != '0'
+SCRATCH_MAIN = int(os.environ.get('PD_SCRATCH_MAIN', '30000'))
+SCRATCH_MAX = int(os.environ.get('PD_SCRATCH_MAX', '60000'))
+SCRATCH_CTX = int(os.environ.get('PD_SCRATCH_CTX', '32768'))
 
 
 def log(*a):
@@ -97,8 +117,9 @@ def call_json(host, path, body):
         c.close()
 
 
-def prefill(body):
-    """Stage 1, under pre_lock: pd-pre prefills the prompt and saves its session.  -> (file name, None) or (None, error)."""
+def prefill(body, base=0):
+    """Stage 1, under pre_lock: pd-pre prefills the prompt and saves its session - only past `base` tokens when pd-dec
+    holds them (an incremental file).  -> (file name, None) or (None, error)."""
     pre = dict(body, max_tokens=1, stream=False)
     for k in ('stream_options', 'max_completion_tokens'):
         pre.pop(k, None)
@@ -109,11 +130,22 @@ def prefill(body):
         if st != 200:
             return None, f'prefill on pd-pre: HTTP {st} {json.dumps(r)[:300]}'
         t1 = time.time()
-        st, r = call_json(PRE, '/slots/0?action=save', {'filename': name})
+        st, r = call_json(PRE, '/slots/0?action=save', dict({'filename': name}, **({'base': base} if base else {})))
         if st != 200:
             return None, f'save on pd-pre: HTTP {st} {json.dumps(r)[:300]}'
-    log(f'  prefill {t1 - t0:.1f}s save {time.time() - t1:.2f}s')
+    log(f'  prefill {t1 - t0:.1f}s save {time.time() - t1:.2f}s ({r.get("n_written", 0) / 2**20:.0f} MiB'
+        f'{f", from token {base}" if base else ""})')
     return name, None
+
+
+def restore(name):
+    """pd-dec loads the file, which is then removed.  -> (HTTP status, body)."""
+    st, r = call_json(DEC, '/slots/0?action=restore', {'filename': name})
+    try:
+        os.remove(os.path.join(SLOTS, name))
+    except OSError:
+        pass
+    return st, r
 
 
 def answer_text(raw):
@@ -198,6 +230,15 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 self.relay('POST', self.path, body)
             return
         text = flatten(body)
+        want = body.get('max_completion_tokens') or body.get('max_tokens') or 4096
+        if (SCRATCH and len(restored['text']) >= SCRATCH_MAIN and len(text) <= SCRATCH_MAX and
+                len(text) + int(want) <= SCRATCH_CTX * 0.9 and common_prefix(restored['text'], text) * 2 < len(text)):
+            t0 = time.time()
+            with dec_lock:                     # pd-dec's side session; pd-pre and the main conversation stay as they are
+                t1 = time.time()
+                self.relay('POST', self.path, dict(body, strata_lane='scratch'))
+            log(f'{len(text)} chars side request (scratch): queue {t1 - t0:.1f}s answer {time.time() - t1:.1f}s')
+            return
         # judged against what pd-dec held when the request came in; a request ahead in the queue may change that,
         # which at worst sends a prompt the long way or the short way - never a wrong answer
         keep = common_prefix(held['text'], text)
@@ -210,19 +251,27 @@ class Handler(http.server.BaseHTTPRequestHandler):
             use_pd = False                     # the session would not be reused past an image (see IMAGES_TO)
         else:
             use_pd = fresh >= MIN_CHARS or new_image
+        # incremental when this prompt continues the one pd-dec last restored.  64 tokens of margin: where the earlier
+        # prompt ends, the new text may tokenize the seam differently; pd-pre rounds the base down to a K/V page
+        base = (max(0, restored['tokens'] - 64)
+                if DELTA and restored['tokens'] and text.startswith(restored['text']) else 0)
         if use_pd:
-            name, err = prefill(body)          # stage 1: may overlap the previous request's answer on pd-dec
+            name, err = prefill(body, base)    # stage 1: may overlap the previous request's answer on pd-dec
             if err:
                 log('PD prefill failed, pd-dec prefills the prompt itself:', err)
         with dec_lock:                         # stage 2: the restore and the answer in one hold
             t1 = time.time()
             if name:
-                st, r = call_json(DEC, '/slots/0?action=restore', {'filename': name})
-                try:
-                    os.remove(os.path.join(SLOTS, name))
-                except OSError:
-                    pass
-                if st != 200:
+                st, r = restore(name)
+                if st != 200 and base:
+                    # pd-dec does not hold the start the incremental file needs: the whole session instead
+                    log('PD incremental restore refused, the whole session follows:', st, json.dumps(r)[:200])
+                    name, err = prefill(body)
+                    st, r = restore(name) if name else (0, {'error': err})
+                if st == 200:
+                    restored.update(text=text, tokens=int(r.get('n_restored') or 0))
+                else:
+                    restored.update(text='', tokens=0)
                     log('PD restore failed, pd-dec prefills the prompt itself:', st, json.dumps(r)[:300])
             t2 = time.time()
             raw = self.relay('POST', self.path, body)

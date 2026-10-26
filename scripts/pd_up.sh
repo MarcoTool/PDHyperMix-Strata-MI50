@@ -71,7 +71,8 @@ echo "decode engine ready after $(( $(date +%s) - t0 )) s"
 
 docker run -d --name pd-router --network host -v "$WORK":"$WORK" -v /dev/shm:/dev/shm \
   -e PD_PORT="$PORT_ROUTER" -e PD_PRE_PORT="$PORT_PRE" -e PD_DEC_PORT="$PORT_DEC" -e PD_SLOTS="$SLOTS" -e PD_MIN_CHARS="$PD_MIN_CHARS" \
-  -e PD_IMAGES="${PD_IMAGES:-prefill}" \
+  -e PD_IMAGES="${PD_IMAGES:-prefill}" -e PD_DELTA="${PD_DELTA:-1}" \
+  -e PD_SCRATCH="$( [ "${DEC_SCRATCH_CONTEXT:-0}" -gt 0 ] && echo 1 || echo 0 )" -e PD_SCRATCH_CTX="${DEC_SCRATCH_CONTEXT:-32768}" \
   --entrypoint python3 "$IMG_ROUTER" "$WORK/pd_router.py" >/dev/null
 sleep 2
 curl -s -m 10 "http://127.0.0.1:$PORT_ROUTER/v1/models" | grep -q '"loaded"' && echo "router up on 127.0.0.1:$PORT_ROUTER" || echo "router not answering"

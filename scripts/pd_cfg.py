@@ -50,8 +50,14 @@ if E.get('MMPROJ'):
         dec['vision'] = dict(enc, threads=6)
     pre['args'] = pre['args'] + ['--vision']
     dec['args'] = dec['args'] + ['--vision']
+# the decode engine's side session for side requests (the router's PD_SCRATCH): DEC_SCRATCH_CONTEXT cells beside the
+# main session, and 500 MiB more of the first MI50 kept out of the expert cache for its prompt path and verifier
+SCRATCH_CONTEXT = int(E.get('DEC_SCRATCH_CONTEXT') or 0)
+if SCRATCH_CONTEXT > 0:
+    dec['args'] = dec['args'] + ['--scratch-context', str(SCRATCH_CONTEXT), '--vram-reserve-mib', '1200']
 os.makedirs(E['WORK'], exist_ok=True)
 json.dump(pre, open(f"{E['WORK']}/pd-pre.json", 'w'), indent=1)
 json.dump(dec, open(f"{E['WORK']}/pd-dec.json", 'w'), indent=1)
 print(f"wrote {E['WORK']}/pd-pre.json and pd-dec.json (kv-resident {E['KV_RESIDENT']}, max-context {E['MAX_CONTEXT']}, "
-      f"images {('on, decode encoder ' + ('on the prefill GPU' if SHARED_ENCODER else 'on the CPU')) if E.get('MMPROJ') else 'off'})")
+      f"images {('on, decode encoder ' + ('on the prefill GPU' if SHARED_ENCODER else 'on the CPU')) if E.get('MMPROJ') else 'off'}, "
+      f"side session {SCRATCH_CONTEXT if SCRATCH_CONTEXT > 0 else 'off'})")
