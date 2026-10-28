@@ -2,6 +2,9 @@
 
 **English** · [繁體中文](README.zh-TW.md) · [简体中文](README.zh-CN.md)
 
+> [!NOTE]
+> This branch, `v0.2.7-pdhm-fix-v0.0`, is for confirming why Strata 0.2.7's split serving does not start on two MI50s. It holds the Strata version we tested and the tools we measured with: see [docs/KFD_BUDGET.md](docs/KFD_BUDGET.md). It is not optimized; it only gets split serving to run on gfx906. For PDHyperMix itself, use `main`.
+
 **Prefill / decode disaggregation on a single machine: a high-memory-bandwidth GPU handles decode, a matrix-strong GPU handles prefill.**
 
 [How it works](#how-it-works) · [Benchmarks](docs/BENCHMARKS.md) · [Deploy](docs/DEPLOY.md) · [Known issues](docs/LESSONS.md)
