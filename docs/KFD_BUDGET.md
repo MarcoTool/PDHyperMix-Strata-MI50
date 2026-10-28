@@ -2,7 +2,7 @@
 
 This branch (`v0.2.7-pdhm-fix-v0.0`) is for confirming why Strata 0.2.7's split serving does not start on two MI50s. It holds the Strata version we tested, the tools we measured with, and the results. For running PDHyperMix itself, use [`main`](https://github.com/MarcoTool/PDHyperMix-Strata-MI50).
 
-Upstream report: linked here once it is posted.
+Upstream report: [Niko1221/Strata#4514](https://github.com/Niko1221/Strata/issues/4514)
 
 ## Strata version
 
