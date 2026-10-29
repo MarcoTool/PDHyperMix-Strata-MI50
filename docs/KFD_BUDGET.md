@@ -1,6 +1,6 @@
 # Split serving on two AMD cards: the amdgpu memory budget
 
-This branch (`v0.2.7-pdhm-fix-v0.0`) is for confirming why Strata 0.2.7's split serving does not start on two MI50s. It holds the Strata version we tested, the tools we measured with, and the results. For running PDHyperMix itself, use [`main`](https://github.com/MarcoTool/PDHyperMix-Strata-MI50).
+This branch (`v0.2.7-pdhm-fix-v0.1`) includes what `v0.2.7-pdhm-fix-v0.0` was made for: confirming why Strata 0.2.7's split serving does not start on two MI50s. It holds the Strata version we tested, the tools we measured with, and the results. For running PDHyperMix itself, use [`main`](https://github.com/MarcoTool/PDHyperMix-Strata-MI50).
 
 Upstream report: [Niko1221/Strata#4514](https://github.com/Niko1221/Strata/issues/4514)
 
