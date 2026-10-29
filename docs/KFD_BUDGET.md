@@ -6,22 +6,23 @@ Upstream report: [Niko1221/Strata#4514](https://github.com/Niko1221/Strata/issue
 
 ## Strata version
 
-[MarcoTool/Strata `fix/gfx906-blocking-staging`](https://github.com/MarcoTool/Strata/tree/fix/gfx906-blocking-staging) at [`d39fb2cb`](https://github.com/MarcoTool/Strata/commit/d39fb2cb):
+[MarcoTool/Strata `split-serve-per-role`](https://github.com/MarcoTool/Strata/tree/split-serve-per-role), the same Strata version as [SPLIT_SERVE_3070_MI50.md](SPLIT_SERVE_3070_MI50.md):
 
 | Commit | What it is |
 |---|---|
 | [`5e8a4cca`](https://github.com/Niko1221/Strata/commit/5e8a4cca7d690ac60ca37eb09e7d0e010099ad6d) | Upstream Strata v0.2.7 (engine 0.1.52), unchanged |
 | [`93f866a7`](https://github.com/MarcoTool/Strata/commit/93f866a7) | 0.2.7 compiles for gfx906 again (upstream PR #3986) |
-| [`d39fb2cb`](https://github.com/MarcoTool/Strata/commit/d39fb2cb) | Copies into the GPU expert cache go through the HIP staging buffer on gfx906 too |
+| [`f5cc0ac0`](https://github.com/MarcoTool/Strata/commit/f5cc0ac0) | `split_serve` takes an engine build, backend and environment per role (not used on this page) |
+| [`e27074a7`](https://github.com/MarcoTool/Strata/commit/e27074a7) | Copies into the GPU expert cache go through the HIP staging buffer on gfx906 too |
 
-The branch without the last commit is [`bench/0.2.7-gfx906`](https://github.com/MarcoTool/Strata/tree/bench/0.2.7-gfx906), which is what "stock" means below.
+"Fix" below is a build with `e27074a7`; the runs were measured with the same change as [`d39fb2cb`](https://github.com/MarcoTool/Strata/commit/d39fb2cb), before it was put on this branch. "Stock" is [`bench/0.2.7-gfx906`](https://github.com/MarcoTool/Strata/tree/bench/0.2.7-gfx906): v0.2.7 with `93f866a7` only.
 
 ## The two problems
 
 The amdgpu driver keeps one budget for all host memory registered for AMD GPUs on the machine: RAM × 63/64 − 1.5 GiB, 91.3 GiB on our 94 GiB PC ([`amdgpu_amdkfd_gpuvm.c:126-130`](https://github.com/torvalds/linux/blob/v6.8/drivers/gpu/drm/amd/amdgpu/amdgpu_amdkfd_gpuvm.c#L126-L130)). NVIDIA cards do not use it.
 
 1. **Two HIP engines on one shared arena.** The driver charges the arena once per engine that registers it, so an arena that is one copy in RAM is charged twice. When the whole arena is refused, the second engine registers it slice by slice until the driver refuses a slice, which leaves nothing for the next allocation of either engine. This does not look specific to gfx906, but we have no other AMD cards to check it on.
-2. **gfx906 build only.** Strata's HIP build copies experts through a small staging buffer, but the gfx906 build did not compile it in. Each expert the decode engine copied from the part of the arena it had not registered was registered by ROCr and stayed charged. Fixed by `d39fb2cb`.
+2. **gfx906 build only.** Strata's HIP build copies experts through a small staging buffer, but the gfx906 build did not compile it in. Each expert the decode engine copied from the part of the arena it had not registered was registered by ROCr and stayed charged. Fixed by `e27074a7`.
 
 ## Our results
 
@@ -48,7 +49,7 @@ Empty cells were not traced. A 16K prompt with no cache, one run each:
 Build Strata from the branch above for gfx906:
 
 ```bash
-git clone -b fix/gfx906-blocking-staging https://github.com/MarcoTool/Strata.git && cd Strata
+git clone -b split-serve-per-role https://github.com/MarcoTool/Strata.git && cd Strata
 cmake -S . -B build-906 -G Ninja -DCMAKE_BUILD_TYPE=Release \
   -DSTRATA_HIP_GFX906=ON -DCMAKE_HIP_ARCHITECTURES=gfx906 -DGPU_TARGETS=gfx906 -DSTRATA_NATIVE_EXPERTS=ON \
   -DCMAKE_C_COMPILER=/opt/rocm/llvm/bin/clang -DCMAKE_CXX_COMPILER=/opt/rocm/llvm/bin/clang++
